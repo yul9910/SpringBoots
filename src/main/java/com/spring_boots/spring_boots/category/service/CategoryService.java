@@ -19,9 +19,9 @@ import java.util.stream.Collectors;
 public class CategoryService {
 
   private final CategoryRepository categoryRepository;
-  private final CategoryMapper categoryMapper;
+  //private final CategoryMapper categoryMapper;
 
-
+  /*
   // 새 카테고리 생성
   @Transactional
   public CategoryDetailDto createCategory(CategoryRequestDto requestDto) {
@@ -79,5 +79,5 @@ public class CategoryService {
     );
   }
 
-
+  */
 }

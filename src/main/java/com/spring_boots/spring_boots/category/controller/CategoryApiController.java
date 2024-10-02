@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api")
 @RequiredArgsConstructor
 public class CategoryApiController {
+  /*
 
   private final CategoryService categoryService;
 
@@ -86,4 +87,5 @@ public class CategoryApiController {
       throw new BadRequestException("잘못된_파라미터_형식", "잘못된 페이지네이션 파라미터: " + e.getMessage());
     }
   }
+  */
 }
