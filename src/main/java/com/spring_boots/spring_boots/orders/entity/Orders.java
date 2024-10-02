@@ -1,6 +1,7 @@
 package com.spring_boots.spring_boots.orders.entity;
 
 import com.spring_boots.spring_boots.common.BaseTimeEntity;
+import com.spring_boots.spring_boots.user.domain.Users;
 import jakarta.persistence.*;
 import lombok.*;
 
