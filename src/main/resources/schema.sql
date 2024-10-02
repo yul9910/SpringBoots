@@ -7,8 +7,7 @@ CREATE TABLE `category` (
                             `display_order` INT NOT NULL,
                             `created_at` DATETIME NOT NULL,
                             `updated_at` DATETIME NOT NULL,
-                            `image_url` VARCHAR(255) NULL,
-                            `is_active` BOOLEAN NOT NULL
+                            `image_url` VARCHAR(255) NULL
 );
 
 -- Item 테이블 생성
