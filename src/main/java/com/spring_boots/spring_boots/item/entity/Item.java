@@ -1,5 +1,6 @@
 package com.spring_boots.spring_boots.item.entity;
 
+import com.spring_boots.spring_boots.category.entity.Category;
 import com.spring_boots.spring_boots.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;

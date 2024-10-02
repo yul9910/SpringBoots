@@ -1,5 +1,6 @@
 package com.spring_boots.spring_boots.category.entity;
 
+import com.spring_boots.spring_boots.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -15,7 +16,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Event extends BaseEntity {
+public class Event extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

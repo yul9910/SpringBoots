@@ -1,4 +1,6 @@
-package com.spring_boots.spring_boots.orders.domain;
+package com.spring_boots.spring_boots.orders.entity;
+import com.spring_boots.spring_boots.common.BaseTimeEntity;
+import com.spring_boots.spring_boots.item.entity.Item;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -10,7 +12,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class OrderItems {
+public class OrderItems extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
