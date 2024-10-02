@@ -11,61 +11,75 @@ import java.util.ArrayList;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/orders")
 public class OrdersApiController {
 
     // 사용자 주문 목록 조회
-    @GetMapping
+    @GetMapping("/api/orders")
     public ResponseEntity<List<OrderDto>> getUserOrders(@AuthenticationPrincipal UserPrincipal user) {
-        // 사용자 주문 목록 조회 로직
         List<OrderDto> orders = new ArrayList<>();
         return ResponseEntity.ok(orders);
     }
 
     // 특정 주문 상세 조회
-    @GetMapping("/{orderId}")
-    public ResponseEntity<OrderDetailsDto> getOrderDetails(@PathVariable Long orderId) {
-        // 특정 주문 상세 정보 조회 로직
+    @GetMapping("/api/orders/{orders_id}")
+    public ResponseEntity<OrderDetailsDto> getOrderDetails(@PathVariable Long orders_id) {
         OrderDetailsDto orderDetails = new OrderDetailsDto();
         return ResponseEntity.ok(orderDetails);
     }
 
     // 사용자 주문 추가
-    @PostMapping
+    @PostMapping("/api/orders")
     public ResponseEntity<OrderResponseDto> placeOrder(@RequestBody PlaceOrderRequest request, @AuthenticationPrincipal UserPrincipal user) {
-        // 장바구니 데이터를 받아 주문 추가 로직
         OrderResponseDto response = new OrderResponseDto();
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // 사용자 주문 취소
-    @DeleteMapping("/{orderId}")
-    public ResponseEntity<OrderResponseDto> cancelOrder(@PathVariable Long orderId) {
-        // 주문 취소 로직 추가 필요
+    // 사용자 주문 수정
+    @PutMapping("/api/orders/{orders_id}")
+    public ResponseEntity<OrderResponseDto> updateOrder(@PathVariable Long orders_id, @RequestBody UpdateOrderRequest request) {
         OrderResponseDto response = OrderResponseDto.builder()
-                .ordersId(orderId)
+                .ordersId(orders_id)
+                .status("주문이 성공적으로 수정되었습니다.")
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    // 사용자 주문 취소
+    @DeleteMapping("/api/orders/{orders_id}")
+    public ResponseEntity<OrderResponseDto> cancelOrder(@PathVariable Long orders_id) {
+        OrderResponseDto response = OrderResponseDto.builder()
+                .ordersId(orders_id)
                 .status("주문이 성공적으로 취소되었습니다.")
                 .build();
 
         return ResponseEntity.ok(response);
     }
 
-
     // 관리자 모든 주문 조회
-    @GetMapping("/admin")
+    @GetMapping("/api/admin/orders")
     public ResponseEntity<List<OrderDto>> getAllOrders(@AuthenticationPrincipal UserPrincipal admin) {
-        // 관리자 주문 목록 조회 로직
         List<OrderDto> orders = new ArrayList<>();
         return ResponseEntity.ok(orders);
     }
 
     // 관리자 주문 상태 수정
-    @PatchMapping("/admin/{orderId}/status")
-    public ResponseEntity<OrderResponseDto> updateOrderStatus(@PathVariable Long orderId, @RequestBody UpdateOrderStatusRequest request) {
-        // 주문 상태 수정 로직
+    @PatchMapping("/api/admin/orders/{orders_id}/status")
+    public ResponseEntity<OrderResponseDto> updateOrderStatus(@PathVariable Long orders_id, @RequestBody UpdateOrderStatusRequest request) {
         OrderResponseDto response = OrderResponseDto.builder()
-                .ordersId(orderId)
+                .ordersId(orders_id)
                 .status("주문 상태가 성공적으로 수정되었습니다.")
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    // 관리자 주문 삭제
+    @DeleteMapping("/api/admin/orders/{orders_id}")
+    public ResponseEntity<OrderResponseDto> deleteOrder(@PathVariable Long orders_id) {
+        OrderResponseDto response = OrderResponseDto.builder()
+                .ordersId(orders_id)
+                .status("주문이 성공적으로 삭제되었습니다.")
                 .build();
 
         return ResponseEntity.ok(response);
