@@ -11,13 +11,12 @@ import org.springframework.web.bind.annotation.RestController;
 @NoArgsConstructor
 @RequestMapping("/api")
 public class ItemRestContorller {
-    private ItemRestService itemRestService;
+    private  ItemRestService itemRestService;
     private ItemMapper mapper;
 
     @Autowired
     public ItemRestContorller(ItemRestService itemRestService, ItemMapper mapper) {
         this.itemRestService = itemRestService;
-
         this.mapper = mapper;
     }
 

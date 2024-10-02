@@ -4,9 +4,11 @@ import com.spring_boots.spring_boots.category.entity.Category;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/*
 public interface CategoryMapper {
 
   CategoryDetailDto categoryToCategoryDetailDto(Category category);
@@ -26,4 +28,4 @@ public interface CategoryMapper {
   @Mapping(target = "pageSize", source = "size")
   CategoryAdminListDto toCategoryAdminListDto(List<Category> categories, long totalCount, int page, int size);
 
-}
+}*/
