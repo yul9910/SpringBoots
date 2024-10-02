@@ -21,17 +21,17 @@ public class Category extends BaseEntity {
   private Long id;
 
   @Column(name = "category_name", nullable = false)
-  private String name;
+  private String categoryName;
 
   @Column(name = "category_content")
-  private String content;
+  private String categoryContent;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "parent_category_id")
   private Category parentCategory;
 
   @Column(name = "display_order")
-  private Integer displayOrder;
+  private int displayOrder;
 
   @Column(name = "image_url")
   private String imageUrl;

@@ -27,10 +27,10 @@ public class Event extends BaseEntity {
   private Category category;
 
   @Column(name = "event_title", nullable = false)
-  private String title;
+  private String eventTitle;
 
   @Column(name = "event_content")
-  private String content;
+  private String eventContent;
 
   @Column(name = "thumbnail_image_url")
   private String thumbnailImageUrl;
