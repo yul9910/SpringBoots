@@ -12,7 +12,7 @@ VALUES (101, 1, 'Running Shoes', 5000, 'Comfortable running shoes', 'Brand A', '
 
 -- Orders 테이블에 테스트 데이터 삽입
 INSERT INTO orders (orders_id, user_id, quantity, orders_total_price, created_at, updated_at)
-VALUES (1, 1, 3, 15000, '2024-01-01 00:00:00', '2024-01-01 00:00:00');
+VALUES (1, 1, 3, 15000, NOW(), NOW());
 
 -- OrderItems 테이블에 테스트 데이터 삽입
 INSERT INTO order_items (
@@ -20,5 +20,5 @@ INSERT INTO order_items (
     order_status, shipping_address, recipient_name, recipient_contact, delivery_message,
     created_at, updated_at, is_canceled
 ) VALUES
-      (1, 1, 101, 5000, 1, 'Pending', '서울특별시 강남구 선릉로 433, 신관 6층', '엘리스', '010-4234-3424', '문앞에 배송해주세요', '2024-01-01 00:00:00', '2024-01-01 00:00:00', false),
-      (2, 1, 101, 10000, 2, 'Pending', '서울특별시 강남구 선릉로 433, 신관 8층', 'John Doe', '031-434-223', '부재시 경비실에 맡겨주세요', '2024-01-01 00:00:00', '2024-01-01 00:00:00', false);
+      (1, 1, 101, 5000, 1, 'Pending', '서울특별시 강남구 선릉로 433, 신관 6층', '엘리스', '010-4234-3424', '문앞에 배송해주세요', NOW(), NOW(), false),
+      (2, 1, 101, 10000, 2, 'Pending', '서울특별시 강남구 선릉로 433, 신관 8층', 'John Doe', '031-434-223', '부재시 경비실에 맡겨주세요', NOW(), NOW(), false);
