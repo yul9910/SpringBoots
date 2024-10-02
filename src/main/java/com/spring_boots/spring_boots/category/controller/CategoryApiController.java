@@ -6,10 +6,12 @@ import com.spring_boots.spring_boots.category.config.error.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 
+@Validated
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -19,7 +21,7 @@ public class CategoryApiController {
 
   //관리자 - 새 카테고리 추가
   @PostMapping("/admin/categories")
-  public ResponseEntity<CategoryDetailDto> createCategory(@RequestBody CategoryRequestDto requestDto) {
+  public ResponseEntity<CategoryDetailDto> createCategory(@Valid @RequestBody CategoryRequestDto requestDto) {
     try {
       CategoryDetailDto responseDto = categoryService.createCategory(requestDto);
       return new ResponseEntity<>(responseDto, HttpStatus.CREATED);
@@ -32,7 +34,7 @@ public class CategoryApiController {
   @PutMapping("/admin/categories/{category_id}")
   public ResponseEntity<CategoryDetailDto> updateCategory(
       @PathVariable("category_id") Long categoryId,
-      @RequestBody CategoryRequestDto requestDto) {
+      @Valid @RequestBody CategoryRequestDto requestDto) {
     try {
       CategoryDetailDto responseDto = categoryService.updateCategory(categoryId, requestDto);
       return ResponseEntity.ok(responseDto);
