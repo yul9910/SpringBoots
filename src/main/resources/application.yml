@@ -1,0 +1,32 @@
+spring:
+  application:
+    # Application name
+    name: Spring_boots
+  datasource:
+    # H2 Database configuration
+    driverClassName: org.h2.Driver
+    password: ''
+    username: sa
+    url: jdbc:h2:mem:testdb
+  h2:
+    console:
+      # H2 console settings - Access at http://localhost:8080/h2-console
+      path: /h2-console
+      enabled: 'true'
+  jpa:
+    # JPA Configuration
+    defer-datasource-initialization: 'true'
+    show-sql: 'true'
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.H2Dialect
+    properties:
+      hibernate:
+        format_sql: 'true'
+  sql:
+    init:
+      mode: always
+
+jwt:
+  issuer: test@example.com
+  secret_key: spring-boots
