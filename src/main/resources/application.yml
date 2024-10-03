@@ -30,3 +30,8 @@ spring:
 jwt:
   issuer: test@example.com
   secret_key: spring-boots
+
+  secret: "zJf3VY8whF9OGkNhdMjf3Lx6jqFwG6kLcv3zjX3FSkQ=" ##32byte 이상
+  token:
+    refresh-expires: 1200000 # 20분
+    access-expires: 600000 # 10분
