@@ -13,6 +13,9 @@ spring:
       # H2 console settings - Access at http://localhost:8080/h2-console
       path: /h2-console
       enabled: 'true'
+  devtools:
+    restart:
+      enabled: true
   jpa:
     # JPA Configuration
     defer-datasource-initialization: 'true'
