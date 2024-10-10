@@ -30,7 +30,7 @@ spring:
     init:
       mode: always
   profiles:
-    active: 'aws'
+    active: aws
 
 jwt:
   issuer: test@example.com
