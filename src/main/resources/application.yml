@@ -29,8 +29,6 @@ spring:
   sql:
     init:
       mode: always
-  profiles:
-    active: aws
 
 jwt:
   issuer: test@example.com
@@ -40,3 +38,12 @@ jwt:
   token:
     refresh-expires: 1200000 # 20분
     access-expires: 600000 # 10분
+
+aws:
+  s3:
+    bucket:
+      credentials:
+        accessKey: AKIAWOOXT2P2HYJJ4352
+        secretAccessKey: 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
+      region: ap-northeast-2
+      name: project-springboots
