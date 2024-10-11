@@ -36,5 +36,14 @@ jwt:
 
   secret: "zJf3VY8whF9OGkNhdMjf3Lx6jqFwG6kLcv3zjX3FSkQ=" ##32byte 이상
   token:
-    refresh-expires: 604800000 # 7일
-    access-expires: 900000 # 15분
+    refresh-expires: 1200000 # 20분
+    access-expires: 600000 # 10분
+
+aws:
+  s3:
+    bucket:
+      credentials:
+        accessKey: AKIAWOOXT2P2HYJJ4352
+        secretAccessKey: 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
+      region: ap-northeast-2
+      name: project-springboots
