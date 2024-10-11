@@ -36,8 +36,8 @@ jwt:
 
   secret: "zJf3VY8whF9OGkNhdMjf3Lx6jqFwG6kLcv3zjX3FSkQ=" ##32byte 이상
   token:
-    refresh-expires: 1200000 # 20분
-    access-expires: 600000 # 10분
+    refresh-expires: 604800000 # 7일
+    access-expires: 900000 # 15분
 
 aws:
   s3:
