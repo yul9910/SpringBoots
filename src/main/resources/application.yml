@@ -1,7 +1,6 @@
 spring:
   profiles:
-    active:
-      s3Bucket
+    active: s3Bucket
   application:
     # Application name
     name: Spring_boots
