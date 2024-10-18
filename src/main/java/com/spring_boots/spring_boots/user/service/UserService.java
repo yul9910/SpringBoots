@@ -2,14 +2,19 @@ package com.spring_boots.spring_boots.user.service;
 
 import com.spring_boots.spring_boots.config.jwt.impl.AuthTokenImpl;
 import com.spring_boots.spring_boots.config.jwt.impl.JwtProviderImpl;
+import com.spring_boots.spring_boots.user.domain.Provider;
 import com.spring_boots.spring_boots.user.domain.UserRole;
 import com.spring_boots.spring_boots.user.domain.Users;
+import com.spring_boots.spring_boots.user.domain.UsersInfo;
+import com.spring_boots.spring_boots.user.dto.UserDto;
 import com.spring_boots.spring_boots.user.dto.request.*;
 import com.spring_boots.spring_boots.user.dto.response.UserResponseDto;
+import com.spring_boots.spring_boots.user.repository.UserInfoRepository;
 import com.spring_boots.spring_boots.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,23 +31,22 @@ public class UserService {
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder bCryptPasswordEncoder;
     private final JwtProviderImpl jwtProvider;
+    private final UserInfoRepository userInfoRepository;
 
     public Users save(UserSignupRequestDto dto) {
         if (userRepository.existsByUserRealId(dto.getUserRealId())) {
             throw new IllegalArgumentException("이미 존재하는 ID 입니다.");
         }
 
-        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
         Users user = Users.builder()
                 .username(dto.getUsername())
                 .userRealId(dto.getUserRealId())
                 .email(dto.getEmail())
-                .password(encoder.encode(dto.getPassword()))
+                .password(bCryptPasswordEncoder.encode(dto.getPassword()))
                 .role(UserRole.USER)
                 .build();
-        Users saveUser = userRepository.save(user);
 
-        return saveUser;
+        return userRepository.save(user);
     }
 
     public Users findById(Long userId) {
@@ -70,7 +74,8 @@ public class UserService {
         Map<String, Object> claims = Map.of(
                 "accountId", user.getUserId(),  //JWT 클래임에 accountId
                 "role", user.getRole(),  //JWT 클래임에 role
-                "userRealId",user.getUserRealId()   //JWT 클래임에 실제 ID 추가
+                "provider",user.getProvider(),
+                "userRealId", user.getUserRealId()   //JWT 클래임에 실제 ID 추가
         );
 
         AuthTokenImpl accessToken = jwtProvider.createAccessToken(
@@ -101,7 +106,20 @@ public class UserService {
     }
 
     @Transactional
-    public void update(Users user, UserUpdateRequestDto userUpdateRequestDto) {
+    public void updateNoneUser(Users user, UserUpdateRequestDto userUpdateRequestDto, Long userInfoId) {
+        if (!bCryptPasswordEncoder.matches(userUpdateRequestDto.getCurrentPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("잘못된 비밀번호입니다.");
+        }
+
+        UsersInfo usersInfo = userInfoRepository.findById(userInfoId).orElse(null);
+        //회원정보가 이미 있다면 업데이트, 그렇지않다면 생성
+        if (usersInfo != null) {
+            usersInfo.updateUserInfo(userUpdateRequestDto);
+        } else {
+            UsersInfo newUsersInfo = userUpdateRequestDto.toUsersInfo(user);
+            userInfoRepository.save(newUsersInfo);
+        }
+
         user.updateUser(userUpdateRequestDto);
     }
 
@@ -138,18 +156,8 @@ public class UserService {
     }
 
     @Transactional
-    public boolean grantAdminToken(Users authUser, AdminGrantTokenRequestDto adminGrantTokenRequestDto) {
-        //임의 토큰 만들기
-        String tempToken = bCryptPasswordEncoder.encode("admin");
-        String adminToken = adminGrantTokenRequestDto.getAdminToken();
-        if (bCryptPasswordEncoder.matches(adminToken, tempToken)) {
-            authUser.updateToAdminRole();
-            return true;
-        } else {
-            log.info("잘못된 관리자 토큰");
-            return false;
-        }
-
+    public void grantRole(Users authUser, AdminGrantTokenRequestDto adminGrantTokenRequestDto) {
+        authUser.updateToRole(adminGrantTokenRequestDto);
     }
 
     public boolean isGrantAdmin(Users authUser) {
@@ -158,5 +166,46 @@ public class UserService {
 
     public boolean validateToken(String accessToken) {
         return jwtProvider.validateToken(accessToken);
+    }
+
+    public boolean validateAdminToken(String accessToken) {
+        return jwtProvider.validateAdminToken(accessToken);
+    }
+
+    //관리자코드체크
+    public boolean checkAdminCode(AdminCodeRequestDto adminCodeDto) {
+        //임의 토큰 만들기
+        String tempAdminCode = bCryptPasswordEncoder.encode("admin");
+        String adminCode = adminCodeDto.getAdminCode();
+        if (bCryptPasswordEncoder.matches(adminCode, tempAdminCode)) {
+            return true;
+        } else {
+            log.info("잘못된 관리자 토큰");
+            return false;
+        }
+    }
+
+    //엔티티 변경
+    public Users getUserEntityByDto(UserDto userDto) {
+        return userRepository.findById(userDto.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("해당 유저를 찾을 수 없습니다: " + userDto.getUserId()));
+    }
+
+    //oauth2 의 경우 이메일과 아이디 동일
+    public Users findByUserRealId(String email) {
+        return userRepository.findByUserRealId(email)
+                .orElseThrow(() -> new IllegalArgumentException("회원정보가 존재하지않습니다."));
+    }
+
+    @Transactional
+    public void updateGoogleUser(Users user, UserUpdateRequestDto userUpdateRequestDto, Long userInfoId) {
+        UsersInfo usersInfo = userInfoRepository.findById(userInfoId).orElse(null);
+        //회원정보가 이미 있다면 업데이트, 그렇지않다면 생성
+        if (usersInfo != null) {
+            usersInfo.updateUserInfo(userUpdateRequestDto);
+        } else {
+            UsersInfo newUsersInfo = userUpdateRequestDto.toUsersInfo(user);
+            userInfoRepository.save(newUsersInfo);
+        }
     }
 }

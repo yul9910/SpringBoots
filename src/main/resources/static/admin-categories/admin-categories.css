@@ -56,10 +56,22 @@
   font-size: 0.75rem;
 }
 
+.button.is-outlined:hover {
+  background-color: #f5f5f5;
+  color: #363636;
+}
+
 /* 컬럼 정렬 */
 .column {
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
+}
+
+.modal .box {
+  text-align: center;
+}
+.modal .buttons {
+  justify-content: center;
 }

@@ -1,6 +1,5 @@
 package com.spring_boots.spring_boots.s3Bucket.service;
 
-import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.spring_boots.spring_boots.s3Bucket.config.S3Config;
 import lombok.RequiredArgsConstructor;
@@ -18,18 +17,19 @@ import java.time.format.DateTimeFormatter;
 @RequiredArgsConstructor
 public class S3BucketService {
 
-    @Autowired
     private final S3Config s3Config;
 
     @Value("${aws.s3.bucket.name}")
     private String bucketName;
 
-    private final String bucketUrl = "https://project-springboots.s3.ap-northeast-2.amazonaws.com/";
+    private String getFileNameFromUrl(String fileUrl) {
+        return fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+    }
 
     // 파일 기본 경로 업로드
     public String uploadFile(MultipartFile file) throws IOException {
         String fileName = makeHashedFileName(file);
-        String fileUrl = bucketUrl + fileName;
+        String fileUrl = "https://" +  bucketName+ ".s3.amazonaws.com/" + fileName;
         ObjectMetadata metadata = createFileMetadata(file);
         try {
             s3Config.amazonS3Client().putObject(bucketName, fileName, file.getInputStream(), metadata);
@@ -42,7 +42,7 @@ public class S3BucketService {
     // 파일 사용자 지정 경로 업로드
     public String uploadFile(MultipartFile file, String path) throws IOException {
         String fileName = (path.endsWith("/") ? path : path + "/") + makeHashedFileName(file);
-        String fileUrl = bucketUrl + fileName;
+        String fileUrl = "https://" +  bucketName+ ".s3.amazonaws.com/" + fileName;
         ObjectMetadata metadata =  createFileMetadata(file);
         try {
             s3Config.amazonS3Client().putObject(bucketName, fileName, file.getInputStream(), metadata);
@@ -75,4 +75,11 @@ public class S3BucketService {
             throw new RuntimeException("파일 삭제 실패: " + e.getMessage());
         }
     }
+
+    // 새로 추가된 메서드: 이미지 URL 가져오기
+    public String getFileUrl(String imageKey) {
+        return "https://" + bucketName + ".s3.amazonaws.com/" + imageKey;
+    }
+
+
 }

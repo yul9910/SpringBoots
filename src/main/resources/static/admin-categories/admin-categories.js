@@ -75,19 +75,20 @@ async function insertCategories(page = 0, size = 10) {
 
     for (const category of categories) {
       const { id, categoryName, categoryThema, displayOrder, createdAt, updatedAt } = category;
+      const koreanThema = translateEnglishToKorean(categoryThema);
 
       categoryList.insertAdjacentHTML(
         "beforeend",
         `
           <div class="columns orders-item" id="category-${id}">
             <div class="column is-2">${categoryName}</div>
-            <div class="column is-2">${categoryThema}</div>
+            <div class="column is-2">${koreanThema}</div>
             <div class="column is-2">${displayOrder}번째</div>
             <div class="column is-2">${new Date(createdAt).toLocaleDateString()}</div>
             <div class="column is-2">${new Date(updatedAt).toLocaleDateString()}</div>
             <div class="column is-2">
-              <button class="button is-info is-small" id="editButton-${id}">수정</button>
-              <button class="button is-danger is-small" id="deleteButton-${id}">삭제</button>
+              <button class="button is-outlined is-small mr-2" id="editButton-${id}">수정</button>
+              <button class="button is-outlined is-small" id="deleteButton-${id}">삭제</button>
             </div>
           </div>
         `
@@ -140,6 +141,12 @@ async function deleteCategoryData() {
 
 // 페이지네이션 생성 함수
 function createPagination(currentPage, totalPages) {
+  // 기존 페이지네이션 제거
+  const existingPagination = document.querySelector('.pagination');
+  if (existingPagination) {
+    existingPagination.remove();
+  }
+
   const paginationContainer = document.createElement('nav');
   paginationContainer.className = 'pagination is-centered';
   paginationContainer.setAttribute('role', 'navigation');
@@ -159,7 +166,7 @@ function createPagination(currentPage, totalPages) {
       pageLink.className += ' is-current';
       pageLink.setAttribute('aria-current', 'page');
     } else {
-      pageLink.addEventListener('click', () => insertCategories(i));
+      pageLink.addEventListener('click', () => insertCategories(i));  // 또는 insertEvents(i)
     }
 
     pageItem.appendChild(pageLink);
@@ -167,9 +174,20 @@ function createPagination(currentPage, totalPages) {
   }
 
   paginationContainer.appendChild(paginationList);
-  document.querySelector("#categoriesContainer").after(paginationContainer);
+  document.querySelector("#categoriesContainer").after(paginationContainer);  // 또는 "#eventsContainer"
 }
 
+function translateEnglishToKorean(englishTheme) {
+  const themeMap = {
+    'common': '공용',
+    'women': '여성',
+    'men': '남성',
+    'accessories': '액세서리',
+    'how-to': 'HOW TO'
+  };
+
+  return themeMap[englishTheme];
+}
 
 // Modal 창 관련 함수들
 function openModal() {

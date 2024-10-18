@@ -8,6 +8,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 import org.hibernate.validator.constraints.Length;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.constraints.Positive;
 
@@ -19,8 +20,7 @@ public class UpdateItemDto {
     @Length(max = 200)
     private String itemName;
 
-    @NotNull(message = "카테고리는 필수입니다.")
-    private Category category;
+    private Long categoryId;
 
     @NotBlank(message = "가격은 필수입니다.")
     @Positive(message = "가격은 0보다 커야 합니다.")
@@ -39,5 +39,5 @@ public class UpdateItemDto {
 
     private String imageUrl;
 
-    private String imageDeleted;
+    private MultipartFile file;
 }

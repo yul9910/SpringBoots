@@ -2,6 +2,7 @@
   display: block;
   border-bottom: #ddd 1px solid;
   padding-bottom: 0.7rem;
+  margin-top: 25px;
   margin-bottom: 2rem;
 }
 
@@ -9,7 +10,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: 3rem;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
 }
 
 .register-category-form-box {

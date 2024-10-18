@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.util.List;
 
 
 @Getter
@@ -13,16 +14,12 @@ import java.time.LocalDate;
 public class EventDetailDto {
 
   private Long id;
-
   private String eventTitle;
   private String eventContent;
   private String thumbnailImageUrl;
-  private String contentImageUrl;
+  private List<String> contentImageUrl;
   private LocalDate startDate;
   private LocalDate endDate;
   private Boolean isActive;
-
-  // 독립적으로 사용할 것 같지만 일단은 냅둠
-  private String categoryName;
 
 }
