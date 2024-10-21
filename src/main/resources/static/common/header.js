@@ -9,6 +9,9 @@ async function loadHeader() {
     // 사용자 메뉴 업데이트
     updateUserMenu();
 
+    // 검색 기능 설정
+    setupSearchFunction();
+
     // Bulma navbar toggle script
     const $navbarBurgers = Array.prototype.slice.call(document.querySelectorAll('.navbar-burger'), 0);
     if ($navbarBurgers.length > 0) {
@@ -22,60 +25,13 @@ async function loadHeader() {
       });
     }
 
-    // 카테고리 메뉴 active 상태 관리 및 URL 리다이렉트
-    const menuItems = document.querySelectorAll('.secondary-navbar .navbar-item');
-    menuItems.forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.preventDefault();
-        menuItems.forEach(i => i.classList.remove('is-active'));
-        e.target.classList.add('is-active');
-
-        const theme = e.target.textContent.trim();
-        const englishTheme = translateThemeToEnglish(theme);
-        const url = getUrlForTheme(englishTheme);
-        window.location.href = url;
-      });
-    });
+    // 네비게이션 메뉴 활성화 처리
+    setActiveNavItem();
 
   } catch (error) {
     console.error('헤더를 로드하는 중 오류가 발생했습니다:', error);
   }
 }
-
-// 한글 테마를 영어로 변환하는 함수
-function translateThemeToEnglish(koreanTheme) {
-  const themeMap = {
-    '공용': 'common',
-    '여성': 'women',
-    '남성': 'men',
-    '액세서리': 'accessories',
-    'SALE': 'sale',
-    'COLLABORATION': 'collaboration',
-    'HOW TO': 'how-to',
-    'NEW-IN': 'new-in',
-    'BEST': 'best',
-    'EVENT': 'event'
-  };
-
-  return themeMap[koreanTheme];
-}
-
-// 테마에 따른 URL을 반환하는 함수
-function getUrlForTheme(theme) {
-  switch (theme) {
-    case 'how-to':
-      return '/categories/how-to';
-    case 'new-in':
-      return '/categories/new-in';
-    case 'best':
-      return '/categories/best';
-    case 'event':
-      return '/events';
-    default:
-      return `/categories/${theme}/1`;
-  }
-}
-
 
 async function updateUserMenu() {
   const userMenu = document.getElementById('user-menu');
@@ -94,8 +50,8 @@ async function updateUserMenu() {
       }
       menuHTML += `
         <a class="navbar-item" href="/mypage">마이 페이지</a>
-        <a class="navbar-item" href="/cart">장바구니</a>
-        <a class="navbar-item" href="#" id="logout">로그아웃</a> <!-- 로그아웃 링크를 id로 지정 -->
+        <a class="navbar-item" href="/cart/cart.html">장바구니</a>
+        <a class="navbar-item" href="#" id="logout">로그아웃</a>
       `;
     } else {
       // 사용자가 로그인하지 않은 경우
@@ -108,21 +64,19 @@ async function updateUserMenu() {
 
     // 로그아웃 버튼 클릭 이벤트 처리
     document.getElementById('logout')?.addEventListener('click', async (event) => {
-      event.preventDefault(); // 기본 링크 클릭 동작 방지
+      event.preventDefault();
       try {
         const response = await fetch('/api/logout', {
           method: 'POST',
-          credentials: 'include' // 쿠키가 필요한 경우
+          credentials: 'include'
         });
 
         if (response.ok) {
-          // 로그아웃 성공 시, 사용자 메뉴를 업데이트
           userMenu.innerHTML = `
             <a class="navbar-item" href="/login">로그인</a>
             <a class="navbar-item" href="/register">회원가입</a>
           `;
-          // 필요하다면 리디렉션할 수 있음
-          window.location.href = '/'; // 예: 로그인 페이지로 리디렉션
+          window.location.href = '/';
         } else {
           console.error('로그아웃 실패:', response.statusText);
         }
@@ -131,11 +85,8 @@ async function updateUserMenu() {
       }
     });
 
-
-
   } catch (error) {
     console.error('사용자 정보를 가져오는 데 실패했습니다:', error);
-    // 에러 발생 시 로그인되지 않은 상태로 처리
     userMenu.innerHTML = `
       <a class="navbar-item" href="/login">로그인</a>
       <a class="navbar-item" href="/register">회원가입</a>
@@ -143,5 +94,75 @@ async function updateUserMenu() {
   }
 }
 
-export { loadHeader };
+// 검색 기능 설정
+function setupSearchFunction() {
+  const searchForm = document.querySelector('.search-container .field');
+  const searchInput = document.querySelector('.search-input');
+  const searchButton = document.querySelector('.search-button');
 
+  function performSearch(event) {
+    event.preventDefault();
+    const keyword = searchInput.value.trim();
+    if (keyword) {
+      window.location.href = `/items/search?keyword=${encodeURIComponent(keyword)}`;
+    }
+  }
+
+  // 폼 제출 이벤트 리스너
+  searchForm.addEventListener('submit', performSearch);
+  // 검색 버튼 클릭 이벤트 리스너
+  searchButton.addEventListener('click', performSearch);
+
+  // 입력 필드에서 엔터키 입력 처리
+  searchInput.addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+      performSearch(event);
+    }
+  });
+}
+
+// 카테고리 메뉴 활성화 설정
+function setActiveNavItem() {
+  const currentPath = window.location.pathname;
+  const navItems = document.querySelectorAll('.secondary-navbar .navbar-item');
+
+  navItems.forEach(item => {
+    const itemPath = item.getAttribute('href');
+    if (currentPath === itemPath || (itemPath !== '/' && currentPath.startsWith(itemPath))) {
+      item.classList.add('is-active');
+    } else {
+      item.classList.remove('is-active');
+    }
+  });
+
+  // 현재 활성 메뉴 저장
+  localStorage.setItem('activeNavItem', currentPath);
+}
+
+// 페이지 로드 시 실행
+document.addEventListener('DOMContentLoaded', () => {
+  loadHeader().then(() => {
+    const activeNavItem = localStorage.getItem('activeNavItem');
+    if (activeNavItem) {
+      const navItem = document.querySelector(`.secondary-navbar .navbar-item[href="${activeNavItem}"]`);
+      if (navItem) {
+        navItem.classList.add('is-active');
+      }
+    }
+  });
+});
+
+// 네비게이션 메뉴 클릭 이벤트 처리
+document.addEventListener('click', (event) => {
+  if (event.target.matches('.secondary-navbar .navbar-item')) {
+    const navItems = document.querySelectorAll('.secondary-navbar .navbar-item');
+    navItems.forEach(item => item.classList.remove('is-active'));
+    event.target.classList.add('is-active');
+    localStorage.setItem('activeNavItem', event.target.getAttribute('href'));
+  }
+});
+
+// 히스토리 변경 시 실행 (SPA에서 페이지 전환 시)
+window.addEventListener('popstate', setActiveNavItem);
+
+export { loadHeader };

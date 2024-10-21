@@ -2,8 +2,11 @@ package com.spring_boots.spring_boots.user.domain;
 
 import com.spring_boots.spring_boots.common.BaseTimeEntity;
 import com.spring_boots.spring_boots.orders.entity.Orders;
+import com.spring_boots.spring_boots.user.dto.UserDto;
+import com.spring_boots.spring_boots.user.dto.request.AdminGrantTokenRequestDto;
 import com.spring_boots.spring_boots.user.dto.request.UserUpdateRequestDto;
 import com.spring_boots.spring_boots.user.dto.response.UserResponseDto;
+import com.spring_boots.spring_boots.user.dto.response.UsersInfoResponseDto;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -14,6 +17,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Entity
 @Getter
@@ -36,7 +40,7 @@ public class Users extends BaseTimeEntity implements UserDetails {
     @Column(name = "email", nullable = false)
     private String email;
 
-    @Column(name = "password", nullable = false)
+    @Column(name = "password")
     private String password;
 
     @Column(name = "is_deleted")
@@ -101,20 +105,61 @@ public class Users extends BaseTimeEntity implements UserDetails {
     }
 
     public UserResponseDto toResponseDto() {
+        //UsersInfo 를 UsersInfoResponseDto 로 변경
+        List<UsersInfoResponseDto> userInfoDtos = usersInfoList.stream()
+                .map(UsersInfo::toUsersInfoResponseDto)
+                .toList();
+
         return UserResponseDto.builder()
+                .userId(userId)
                 .email(email)
                 .username(username)
                 .userRealId(userRealId)
+                .provider(provider)
                 .role(role)
+                .createdAt(getCreatedAt())
+                .userInfoList(userInfoDtos)
                 .build();
     }
 
     public void updateUser(UserUpdateRequestDto userUpdateRequestDto) {
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-        this.password = encoder.encode(userUpdateRequestDto.getPassword());
+
+        //비밀번호 값이 들어있지않다면 변경 하지않는다.
+        if (userUpdateRequestDto.getUpdatePassword() != null) {
+            this.password = encoder.encode(userUpdateRequestDto.getUpdatePassword());
+        }
         this.email = userUpdateRequestDto.getEmail();
     }
-    public void updateToAdminRole() {
-        role = UserRole.ADMIN;
+
+    public void updateToRole(AdminGrantTokenRequestDto adminGrantTokenRequestDto) {
+        this.role = adminGrantTokenRequestDto.getRoles();
+    }
+
+    public String getMember() {
+        return username;
+    }
+
+    public UserDto toUserDto() {
+        return UserDto.builder()
+                .userId(this.userId)
+                .username(this.username)
+                .userRealId(this.userRealId)
+                .email(this.email)
+                .password(this.password)
+                .isDeleted(this.isDeleted)
+                .deleteReason(this.deleteReason)
+                .role(this.role)
+                .provider(this.provider)
+                .usersInfoList(this.usersInfoList)
+                .ordersList(this.ordersList)
+                .build();
+    }
+
+    //구글로 로그인시 업데이트
+    public Users updateName(String username) {
+        this.username = username;
+        this.provider = Provider.GOOGLE;
+        return this;
     }
 }

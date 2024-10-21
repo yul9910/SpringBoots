@@ -2,10 +2,9 @@ package com.spring_boots.spring_boots.category.controller;
 
 import com.spring_boots.spring_boots.category.dto.category.CategoryAdminDto;
 import com.spring_boots.spring_boots.category.dto.category.CategoryDto;
+import com.spring_boots.spring_boots.category.entity.Category;
 import com.spring_boots.spring_boots.category.service.CategoryService;
-import com.spring_boots.spring_boots.common.config.error.BadRequestException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,7 +19,6 @@ public class CategoryApiController {
   private final CategoryService categoryService;
 
 
-  // TODO: 테마에 대한 추가 정보가 필요할 경우 CategoryThemaDto로 변경 고려
   // 모든 카테고리 테마 목록 조회
   @GetMapping("/themas")
   public ResponseEntity<List<String>> getAllThemas() {
@@ -41,5 +39,11 @@ public class CategoryApiController {
     CategoryDto category = categoryService.getCategoryDetail(categoryId);
     return ResponseEntity.ok(category);
   }
-  
+
+  @GetMapping("/themas/displayOrder/{theme}")
+  public List<Category> getCategoriesByTheme(@PathVariable String theme) {
+    List<CategoryDto> categories = categoryService.getCategoriesByThema(theme);
+    return categoryService.getCategoriesExcludingDisplayOrder(1);
+  }
+
 }

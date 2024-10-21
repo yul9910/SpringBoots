@@ -1,8 +1,11 @@
 package com.spring_boots.spring_boots.config;
 
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.util.List;
 
 /**
  * url 패스 경로 바꾸기
@@ -20,10 +23,13 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addViewController("/register").setViewName("forward:/register/register.html"); //회원가입 페이지
         registry.addViewController("/mypage").setViewName("forward:/account/account.html");   //마이페이지
         registry.addViewController("/account/signout").setViewName("forward:/account-signout/account-signout.html"); //회원 탈퇴 페이지
+        registry.addViewController("/account/security").setViewName("forward:/account-security/account-security.html"); //회원 정보
         registry.addViewController("/order-summary").setViewName("forward:/order-summary/order-summary.html");
         registry.addViewController("/order-list").setViewName("forward:/order-list/order-list.html");
         registry.addViewController("/order").setViewName("forward:/order/order.html");
         registry.addViewController("/order-details").setViewName("forward:/order-details/order-details.html");
+        registry.addViewController("/admin").setViewName("forward:/admin/admin.html");
+        registry.addViewController("/admin/users").setViewName("forward:/admin-users/admin-users.html");
         registry.addViewController("/admin-orders").setViewName("forward:/admin-orders/admin-orders.html");
         // 카테고리 관리 페이지
         registry.addViewController("/admin/categories").setViewName("forward:/admin-categories/admin-categories.html");
@@ -39,12 +45,22 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addViewController("/categories/**").setViewName("forward:/category-detail/category-detail.html");
         // 이벤트 목록 페이지
         registry.addViewController("/events").setViewName("forward:/event-list/event-list.html");
+        // 이벤트 관리 페이지
+        registry.addViewController("/admin/events").setViewName("forward:/admin-event/admin-event.html");
         // 이벤트 생성 페이지
-        registry.addViewController("/events/create").setViewName("forward:/event-form/event-form.html");
+        registry.addViewController("/admin/events/create").setViewName("forward:/event-form/event-form.html");
         // 이벤트 수정 페이지
-        registry.addViewController("/events/edit").setViewName("forward:/event-form/event-form.html");
+        registry.addViewController("/admin/events/edit").setViewName("forward:/event-form/event-form.html");
         // 이벤트 상세 페이지
         registry.addViewController("/events/**").setViewName("forward:/event-detail/event-detail.html");
+        // 상품 검색 화면
+        registry.addViewController("/items/search").setViewName("forward:/search/search.html");
         registry.addViewController("/admin/items").setViewName(("forward:/product-add/product-add.html"));
+    }
+
+    @Override
+    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
+        // 커스텀 ArgumentResolver 추가
+        resolvers.add(new UserDtoArgumentResolver());
     }
 }

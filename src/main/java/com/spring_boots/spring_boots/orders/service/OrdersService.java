@@ -1,5 +1,6 @@
 package com.spring_boots.spring_boots.orders.service;
 
+import com.spring_boots.spring_boots.common.config.error.BadRequestException;
 import com.spring_boots.spring_boots.item.entity.Item;
 import com.spring_boots.spring_boots.item.repository.ItemRepository;
 import com.spring_boots.spring_boots.orders.dto.*;
@@ -8,6 +9,8 @@ import com.spring_boots.spring_boots.orders.entity.Orders;
 import com.spring_boots.spring_boots.orders.repository.OrderItemsRepository;
 import com.spring_boots.spring_boots.orders.repository.OrdersRepository;
 import com.spring_boots.spring_boots.user.domain.Users;
+import com.spring_boots.spring_boots.user.dto.UserDto;
+import com.spring_boots.spring_boots.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +29,8 @@ public class OrdersService {
 
     private final ItemRepository itemRepository;
     private final OrderItemsRepository orderItemsRepository;
+
+    private final UserService userService;
 
     // 사용자 주문 목록 조회
     /*
@@ -51,7 +56,7 @@ public class OrdersService {
 
 
     // 특정 주문 상세 조회
-    public Optional<OrderDetailsDto> getOrderDetails(Long ordersId, Users currentUser) {
+    public Optional<OrderDetailsDto> getOrderDetails(Long ordersId, UserDto currentUser) {
         return ordersRepository.findById(ordersId)
                 .filter(order -> !order.getIsCanceled())
                 .filter(order -> order.getUser().getUserId().equals(currentUser.getUserId()))  // 사용자 검증 추가
@@ -92,8 +97,19 @@ public class OrdersService {
 
     // 사용자 주문 추가
     @Transactional
-    public Orders createOrder(OrderRequestDto request, Users currentUser) {
-        System.out.println(request);
+    public Orders createOrder(OrderRequestDto request, UserDto currentUser) {
+        // UserDto를 Users 엔티티로 변환
+        Users userEntity = userService.getUserEntityByDto(currentUser);
+
+
+        // 필수 필드 유효성 검사
+        if (request.getRecipientName().isEmpty() || request.getShippingAddress().isEmpty()) {
+            throw new BadRequestException("INVALID_ORDER_REQUEST", "수취인 정보 또는 배송 주소가 누락되었습니다.");
+        }
+
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new BadRequestException("INVALID_ORDER_REQUEST", "주문할 상품이 없습니다.");
+        }
 
         // 주문의 총 수량 및 총 가격 계산
         int totalQuantity = request.getItems().stream()
@@ -106,7 +122,7 @@ public class OrdersService {
 
         // Orders 엔티티 생성 및 저장
         Orders order = Orders.builder()
-                .user(currentUser) // 현재 로그인된 사용자
+                .user(userEntity) // 현재 로그인된 사용자
                 .quantity(totalQuantity)
                 .ordersTotalPrice(totalPrice)
                 .orderStatus("주문완료") // 주문 상태는 기본적으로 '주문완료'
@@ -121,7 +137,7 @@ public class OrdersService {
         List<OrderItems> orderItemsList = request.getItems().stream()
                 .map(itemDto -> {
                     Item item = itemRepository.findById(itemDto.getItemId())
-                            .orElseThrow(() -> new IllegalArgumentException("Item not found with id: " + itemDto.getItemId()));
+                            .orElseThrow(() -> new BadRequestException("ITEM_NOT_FOUND", "해당 ID의 상품을 찾을 수 없습니다: " + itemDto.getItemId()));
 
                     return OrderItems.builder()
                             .orders(savedOrder)
@@ -149,7 +165,7 @@ public class OrdersService {
 
     // 사용자 주문 수정
     @Transactional
-    public Optional<OrderResponseDto> updateOrder(Long ordersId, UpdateOrderRequest request, Users currentUser) {
+    public Optional<OrderResponseDto> updateOrder(Long ordersId, UpdateOrderRequest request, UserDto currentUser) {
         return ordersRepository.findById(ordersId).map(order -> {
             // 주문 소유자가 현재 사용자와 일치하는지 확인
             if (!order.getUser().getUserId().equals(currentUser.getUserId())) {
@@ -186,9 +202,9 @@ public class OrdersService {
 
 
     // 사용자 주문 취소
-    public Optional<OrderResponseDto> cancelOrder(Long ordersId, Users authenticatedUser) {
+    public Optional<OrderResponseDto> cancelOrder(Long ordersId, UserDto currentUser) {
         return ordersRepository.findById(ordersId)
-                .filter(order -> order.getUser().getUserId().equals(authenticatedUser.getUserId())) // 주문 소유자 확인
+                .filter(order -> order.getUser().getUserId().equals(currentUser.getUserId())) // 주문 소유자 확인
                 .map(order -> {
                     if (!order.getIsCanceled()) {
                         order.setIsCanceled(true);
@@ -259,36 +275,5 @@ public class OrdersService {
                 orderItemDtos
         );
     }
-
-    /*
-    private OrderDetailsDto convertToOrderDetailsDto(Orders orders) {
-        List<OrderItems> orderItemsList = orderItemsRepository.findByOrders(orders);
-
-        List<OrderDetailsDto.OrderItemDetailsDto> orderItemDetailsDtos = orderItemsList.stream()
-                .map(item -> new OrderDetailsDto.OrderItemDetailsDto(
-                        item.getItem().getItemName(),
-                        item.getOrderItemsQuantity(),
-                        item.getOrderItemsTotalPrice(),
-                        item.getItem().getImageUrl()
-                )).collect(Collectors.toList());
-
-        // OrderItems 리스트에서 기본 정보를 가져오기
-        String shippingAddress = orderItemsList.isEmpty() ? null : orderItemsList.get(0).getShippingAddress();
-        String recipientName = orderItemsList.isEmpty() ? null : orderItemsList.get(0).getRecipientName();
-        String recipientContact = orderItemsList.isEmpty() ? null : orderItemsList.get(0).getRecipientContact();
-
-        return new OrderDetailsDto(
-                orders.getOrdersId(),
-                orders.getCreatedAt(),
-                orders.getOrdersTotalPrice(),
-                orders.getOrderStatus(),
-                shippingAddress,
-                recipientName,
-                recipientContact,
-                orders.getDeliveryFee() != null ? orders.getDeliveryFee() : 0,
-                orders.getQuantity(),
-                orderItemDetailsDtos
-        );
-    }*/
 
 }

@@ -30,6 +30,7 @@ build:
   before_script:
     - chmod +x ./gradlew
   script:
+    #gradlew 과정에서 문제가 있으면, gradle wrapper 확인
     - echo 'build starts'
     - ./gradlew build -x test
   artifacts:
@@ -46,7 +47,7 @@ deploy:
     - scp -i ~/.ssh/id_rsa -P "$SERVER_PORT" build/libs/*.jar "$SERVER_USER"@"$SERVER_HOST":/home/"$SERVER_USER/"
     - ssh -i ~/.ssh/id_rsa -p "$SERVER_PORT" "$SERVER_USER"@"$SERVER_HOST" "cd ~/"
     - ssh -i ~/.ssh/id_rsa -p "$SERVER_PORT" "$SERVER_USER"@"$SERVER_HOST" "./deploy.sh"
-
+   
   only:
     - main
 variables:

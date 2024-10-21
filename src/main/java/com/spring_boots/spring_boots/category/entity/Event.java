@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 
 @Entity
@@ -21,22 +23,20 @@ public class Event extends BaseTimeEntity {
   @Column(name = "event_id")
   private Long id;
 
-  // 카테고리와의 독립 필요
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "category_id")
-  private Category category;
-
   @Column(name = "event_title", nullable = false)
   private String eventTitle;
 
-  @Column(name = "event_content", nullable = false)
+  @Column(name = "event_content", columnDefinition = "TEXT", nullable = false)
   private String eventContent;
 
   @Column(name = "thumbnail_image_url")
-  private String thumbnailImageUrl;
+  private String thumbnailImageUrl = "";
 
+  @ElementCollection
+  @CollectionTable(name = "event_content_images", joinColumns = @JoinColumn(name = "event_id"))
   @Column(name = "content_image_url")
-  private String contentImageUrl;
+  @Builder.Default
+  private List<String> contentImageUrl = new ArrayList<>();  // 빈 리스트로 초기화
 
   @Column(name = "start_date")
   private LocalDate startDate;
@@ -50,9 +50,7 @@ public class Event extends BaseTimeEntity {
 
   // end_date가 지났는지 확인하고 is_Active를 업데이트하는 메서드
   public void updateActiveStatus() {
-    if (this.endDate != null && LocalDate.now().isAfter(this.endDate)) {
-      this.isActive = false;
-    }
+    this.isActive = this.endDate != null && !LocalDate.now().isAfter(this.endDate);
   }
 
   // 이벤트 종료일 변경 설정 시 자동으로 상태 업데이트
@@ -61,11 +59,15 @@ public class Event extends BaseTimeEntity {
     updateActiveStatus();
   }
 
-  // 카테고리 id가 없는 경우 제거
-  public void removeCategory() {
-    this.category = null;
-  }
+  // 빌더 패턴을 사용할 때 기본값을 설정하기 위한 정적 내부 클래스
+  public static class EventBuilder {
+    private List<String> contentImageUrl = new ArrayList<>();
 
+    public EventBuilder contentImageUrl(List<String> contentImageUrl) {
+      this.contentImageUrl = contentImageUrl != null ? contentImageUrl : new ArrayList<>();
+      return this;
+    }
+  }
 
   // 1. 생성자를 통한 초기화
   // 2. 빌더 패턴 사용
