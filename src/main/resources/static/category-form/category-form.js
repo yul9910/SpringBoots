@@ -16,6 +16,8 @@ const formTitle = document.querySelector("#formTitle");
 
 const categoryId = new URLSearchParams(window.location.search).get('id');
 const isEditMode = !!categoryId;
+let originalTheme = '';
+
 
 // 페이지 로드 시 초기 상태 설정
 async function initializePage() {
@@ -35,12 +37,13 @@ async function initializePage() {
   console.log("Page initialization complete.");
 }
 
-
 function addAllEvents() {
   console.log("Adding all events...");
   categoryForm.addEventListener("submit", handleSubmit);
   imageInput.addEventListener("change", handleImageUpload);
   themeSelectBox.addEventListener("change", handleThemeChange);
+  /*descriptionInput.addEventListener('input', handleNotThemeChange);  // 카테고리 내용 변경 이벤트
+  displaySelectBox.addEventListener('focus', handleNotThemeChange);  // 배치 순서 선택 시점 이벤트*/
   console.log("All events added.");
 }
 
@@ -48,7 +51,7 @@ function toggleImageUploadField() {
   console.log("Toggling image upload field...");
   console.log("Current theme:", themeSelectBox.value);
 
-  if (themeSelectBox.value !== "how-to") {
+  if (themeSelectBox.value !== "recommend") {
     imageUploadField.style.display = "none";
     imageInput.value = ""; // 이미지 입력 초기화
     fileNameSpan.innerText = "사진파일 (png, jpg, jpeg)";
@@ -60,33 +63,104 @@ function toggleImageUploadField() {
 }
 
 async function handleThemeChange() {
-  const selectedTheme = themeSelectBox.value;
-  console.log("Selected theme:", selectedTheme);
+    const selectedTheme = themeSelectBox.value;
+    console.log("Selected theme:", selectedTheme);
 
-  if (selectedTheme) {
+    if (!selectedTheme) return;
+
     try {
-      const categories = await Api.get(`/api/categories/themas/${selectedTheme}`);
-      updateDisplayOrderOptions(categories.length);
+        // 현재 선택된 값 저장
+        const currentValue = displaySelectBox.value;
+
+        await updateDisplayOrderOptions(selectedTheme);
+
+        // 이전 선택값이 있고 유효한 경우 복원
+        if (currentValue && displaySelectBox.querySelector(`option[value="${currentValue}"]`)) {
+            displaySelectBox.value = currentValue;
+        }
     } catch (err) {
-      console.error("Error fetching categories:", err);
-      alert('카테고리 정보를 불러오는데 실패했습니다: ' + err.message);
+        console.error("Error updating display order options:", err);
+        alert('배치 순서 옵션을 업데이트하는데 실패했습니다: ' + err.message);
     }
-  } else {
-    updateDisplayOrderOptions(0);
-  }
 
-  toggleImageUploadField();
+    toggleImageUploadField();
 }
 
-function updateDisplayOrderOptions(count) {
-  displaySelectBox.innerHTML = '<option value="">배치할 위치를 골라주세요.</option>';
-  for (let i = 1; i <= count + 1; i++) {
-    const option = document.createElement('option');
-    option.value = i;
-    option.textContent = `${i}번째`;
-    displaySelectBox.appendChild(option);
-  }
+/*// 배치 순서 선택 이벤트 핸들러
+function handleNotThemeChange() {
+    const selectedTheme = themeSelectBox.value;
+    if (selectedTheme) {
+        handleThemeChange();
+    }
+}*/
+
+async function updateDisplayOrderOptions(selectedTheme, currentCategoryId = null, currentDisplayOrder = null) {
+   // 기본 옵션으로 초기화
+   displaySelectBox.innerHTML = '<option value="">배치할 위치를 골라주세요.</option>';
+
+   // '전체보기' 카테고리인 경우 select box 비활성화
+   if (titleInput.value.trim() === '전체보기') {
+       displaySelectBox.disabled = true;
+       return;
+   }
+
+   // select box 활성화
+   displaySelectBox.disabled = false;
+
+   if (selectedTheme) {
+       try {
+           // 선택된 테마의 모든 카테고리 조회
+           const categories = await Api.get(`/api/categories/themas/${selectedTheme}`);
+
+           // '전체보기'가 아니고 현재 수정 중인 카테고리가 아닌 카테고리만 필터링
+           const nonAllViewCategories = categories.filter(c =>
+               c.categoryName !== '전체보기' &&
+               c.id !== currentCategoryId
+           );
+
+           // 최대 순서 결정
+           const maxOrder = isEditMode && selectedTheme === originalTheme
+               ? nonAllViewCategories.length      // 같은 테마 내에서 수정 시
+               : nonAllViewCategories.length + 1; // 새로운 테마로 변경 시
+
+           // maxOrder까지의 옵션 생성
+           for (let i = 1; i <= maxOrder; i++) {
+               const option = document.createElement('option');
+               option.value = i;
+               option.textContent = `${i}번째`;
+
+               // 수정 모드면서 현재 카테고리의 displayOrder와 일치하면 선택
+               if (isEditMode && i === currentDisplayOrder) {
+                   option.selected = true;
+               }
+               displaySelectBox.appendChild(option);
+           }
+       } catch (err) {
+           console.error("Error fetching categories:", err);
+           alert('카테고리 정보를 불러오는데 실패했습니다: ' + err.message);
+       }
+   }
 }
+
+// 카테고리 이름 입력 필드에 이벤트 리스너 추가
+titleInput.addEventListener('input', function() {
+    // 입력값 정규화 (공백 제거)
+    const normalizedValue = this.value.trim();
+
+    const selectedTheme = themeSelectBox.value;
+    if (!selectedTheme) return;
+
+    // 이전 값과 현재 값이 같으면 중복 실행 방지
+    if (this._lastValue === normalizedValue) return;
+    this._lastValue = normalizedValue;
+
+    // 비동기 실행을 위한 setTimeout 사용
+    clearTimeout(this._timeout);
+    this._timeout = setTimeout(() => {
+        handleThemeChange();
+    }, 100);
+});
+
 
 async function fetchCategoryData() {
   try {
@@ -96,14 +170,21 @@ async function fetchCategoryData() {
     titleInput.value = category.categoryName;
     descriptionInput.value = category.categoryContent;
     themeSelectBox.value = category.categoryThema;
+    originalTheme = category.categoryThema; // 원래 테마 저장
 
     const koreanTheme = translateEnglishToKorean(category.categoryThema);
     console.log("Theme set to:", koreanTheme);
 
     // 테마에 맞는 배치 옵션 업데이트
-    const categories = await Api.get(`/api/categories/themas/${category.categoryThema}`);
-    updateDisplayOrderOptions(categories.length);
-    displaySelectBox.value = category.displayOrder;
+    //await updateDisplayOrderOptions(category.categoryThema, category.id, category.displayOrder);
+
+    // 테마 변경 핸들러 호출하여 배치 옵션 즉시 업데이트
+    await handleThemeChange();
+
+    // 전체보기가 아닌 경우에만 displayOrder 설정
+    if (category.categoryName !== '전체보기') {
+      displaySelectBox.value = category.displayOrder;
+    }
 
     if (category.imageUrl) {
       fileNameSpan.innerText = category.imageUrl.split('/').pop();
@@ -129,15 +210,15 @@ async function handleSubmit(e) {
   const title = titleInput.value;
   const description = descriptionInput.value;
   const theme = themeSelectBox.value;
-  const displayOrder = parseInt(displaySelectBox.value, 10);
+  const displayOrder = title === '전체보기' ? 0 : parseInt(displaySelectBox.value, 10);
   const image = imageInput.files[0];
 
-  if (!title || !theme || isNaN(displayOrder)) {
+  if (!title || !theme || (title !== '전체보기' && isNaN(displayOrder))) {
     return alert("카테고리 이름, 테마, 배치 위치는 필수 입력 항목입니다.");
   }
 
-  if (image && image.size > 3e6) {
-    return alert("사진은 최대 2.5MB 크기까지 가능합니다.");
+  if (image && image.size > 500 * 1024) {
+    return alert("이미지의 크기가 최대 500KB 크기를 초과했습니다.");
   }
 
   try {
@@ -198,7 +279,7 @@ function translateEnglishToKorean(englishTheme) {
     'women': '여성',
     'men': '남성',
     'accessories': '액세서리',
-    'how-to': 'HOW TO'
+    'recommend': 'RECOMMEND'
   };
   return themeMap[englishTheme];
 }
@@ -209,7 +290,7 @@ function translateKoreanToEnglish(koreanTheme) {
     '여성': 'women',
     '남성': 'men',
     '액세서리': 'accessories',
-    'HOW TO': 'how-to'
+    'RECOMMEND': 'recommend'
   };
   return themeMap[koreanTheme];
 }

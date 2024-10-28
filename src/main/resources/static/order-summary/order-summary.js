@@ -33,6 +33,7 @@ async function loadOrderSummary(orderId) {
             throw new Error('주문 정보를 가져오는 중 오류가 발생했습니다.');
         }
         const order = await response.json();
+        console.log(order);  // 응답 데이터를 콘솔에 출력하여 확인
         renderOrderSummary(order);
     } catch (error) {
         document.getElementById('order-summary-root').innerHTML = `<div class="notification is-danger">${error.message}</div>`;
@@ -95,15 +96,18 @@ function renderOrderSummary(order) {
                 <hr />
 
                 <h5 class="title is-5">결제 금액</h5>
-                <p class="mb-1"><strong>총 상품 금액: </strong>₩${order.ordersTotalPrice}</p>
-                <p class="mb-1"><strong>배송비: </strong>₩${order.deliveryFee}</p>
-                <p><strong>총 결제 금액: </strong>₩${order.ordersTotalPrice + order.deliveryFee}</p>
+                <p class="mb-1"><strong>총 상품 금액: </strong>${addCommas(order.ordersTotalPrice)}원</p>
+                <p class="mb-1"><strong>배송비: </strong>${addCommas(order.deliveryFee)}원</p>
+                <p><strong>총 결제 금액: </strong>${addCommas(order.ordersTotalPrice + order.deliveryFee)}원</p>
 
                 <div class="mt-4 has-text-centered">
                     <button class="button is-dark" onclick="window.location.href = '/order-details?orderId=${order.ordersId}'">주문내역 바로가기</button>
-                    <button class="button is-outlined is-dark" onclick="window.location.href = '/shop'">쇼핑 계속하기</button>
+                    <button class="button is-outlined is-dark" onclick="window.location.href = '/'">쇼핑 계속하기</button>
                 </div>
             </div>
         </div>
     `;
 }
+const addCommas = (n) => {
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};

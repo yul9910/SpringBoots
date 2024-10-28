@@ -16,10 +16,13 @@ async function get(endpoint, params = "") {
 
   // 응답 코드가 4XX 계열일 때 (400, 403 등)
   if (!res.ok) {
-    const errorContent = await res.json();
-    const { reason } = errorContent;
-
-    throw new Error(reason);
+    try {
+      const errorContent = await res.json();
+      const { reason } = errorContent;
+      throw new Error(reason);
+    } catch (err) {
+      throw new Error("서버 오류가 발생했습니다. 관리자에게 문의하세요.");
+    }
   }
 
   const result = await res.json();
@@ -188,15 +191,8 @@ async function patchFormData(endpoint, formData) {
     });
 
     if (!res.ok) {
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "서버 오류가 발생했습니다.");
-      } else {
-        const errorText = await res.text();
-        console.error("서버 응답:", errorText);
-        throw new Error("서버 오류가 발생했습니다.");
-      }
+      const errorData = await res.json();
+      throw new Error(errorData.message || "서버 오류가 발생했습니다.");
     }
 
     return await res.json();

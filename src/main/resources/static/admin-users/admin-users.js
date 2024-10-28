@@ -21,7 +21,7 @@ addAllEvents();
 // 요소 삽입 함수들을 묶어주어서 코드를 깔끔하게 하는 역할임.
 function addAllElements() {
   createNavbar();
-  insertUsers();
+  insertUsers(0);
 }
 
 // 여러 개의 addEventListener들을 묶어주어서 코드를 깔끔하게 하는 역할임.
@@ -34,37 +34,76 @@ function addAllEvents() {
 
 // 페이지 로드 시 실행, 삭제할 회원 id를 전역변수로 관리함
 let userIdToDelete;
-async function insertUsers() {
-  const users = await Api.get("/api/admin/users");
+async function insertUsers(page = 0, size = 10) {
+  const usersPage = await Api.get(`/api/admin/users?page=${page}&size=${size}`);
+  console.log('API 응답:', usersPage);
+
+  const currentPage = usersPage.number;
+  const totalPages = usersPage.totalPages;
+  const content = usersPage.content;
+
+  const adminCountApi =await Api.get('/api/admin/count');
 
   // 총 요약에 활용
   const summary = {
-    usersCount: 0,
-    adminCount: 0,
+    usersCount: adminCountApi.totalUser,
+    adminCount: adminCountApi.countAdmin,
   };
 
-  for (const user of users) {
-    const { userId, email, username, role, createdAt, userRealId } = user;
-    const date = createdAt;
+  const usersContainer = document.querySelector("#usersContainer");
+  if (!usersContainer) {
+    console.error('usersContainer 요소를 찾을 수 없습니다.');
+    return;
+  }
+
+  // 기존 유저 목록만 초기화 (컬럼며은 유지)
+  const existingList = usersContainer.querySelector('.user-list');
+  if (existingList) {
+    existingList.remove();
+  }
+
+  // 새로운 카테고리 목록 컨테이너 생성
+  const userList = document.createElement('div');
+  userList.className = 'user-list';
+
+  for (const user of content) {
+    const { userId, email, username, role, createdAt, userRealId, provider, deleted } = user;
+
+    //날짜 포맷팅
+    const dateStr = createdAt;
+    const date =new Date(dateStr);
+
+    // toLocaleString을 사용해 간단히 날짜와 시간을 출력
+    const formattedDate = date.toLocaleString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+//        second: '2-digit',
+    });
+
+    console.log(formattedDate);  // 예: 2024. 10. 20. 오후 4:32:35
+
     const id = userId;
     const fullName = username;
     const roles = role;
 
-    summary.usersCount += 1;
+//    summary.usersCount += 1;
 
-    if (roles.includes('ADMIN')) {
-      summary.adminCount += 1;
-    }
+//    if (roles.includes('ADMIN')) {
+//      summary.adminCount += 1;
+//    }
 
-    usersContainer.insertAdjacentHTML(
+    userList.insertAdjacentHTML(
       "beforeend",
       `
         <div class="columns orders-item" id="user-${id}">
-          <div class="column">${date}</div>
-          <div class="column">${userRealId}</div>
-          <div class="column">${email}</div>
-          <div class="column">${fullName}</div>
-          <div class="column">
+          <div class="column" style="flex: 1;word-break: break-all;">${formattedDate}</div>
+          <div class="column" style="flex: 1;word-break: break-all;">${userRealId}</div>
+          <div class="column" style="flex: 1;word-break: break-all;">${email}</div>
+          <div class="column" style="flex: 1;word-break: break-all;">${fullName}</div>
+          <div class="column" style="flex: 1;word-break: break-all;">
             <div class="select">
               <select id="roleSelectBox-${id}">
                 <option
@@ -82,6 +121,13 @@ async function insertUsers() {
               </select>
             </div>
           </div>
+          <div class="column" style="flex: 1;word-break: break-all;">
+          <!-- 삼항 연산자 안에 삼항연산자 -->
+            ${deleted === false ? 'X' : deleted === true ? 'O' : '알수없음'}
+          </div>
+          <div class="column" style="flex: 1;word-break: break-all;">
+             ${provider === 'NONE' ? '일반' : provider === 'GOOGLE' ? '구글' : provider}
+          </div>
           <!-- <div class="column is-2"> -->
           <!--    <button class="button" id="deleteButton-${id}">회원정보 삭제</button>  -->
           <!--  </div>  -->
@@ -89,32 +135,94 @@ async function insertUsers() {
       `
     );
 
-    // 요소 선택
-    const roleSelectBox = document.querySelector(`#roleSelectBox-${id}`);
-    const deleteButton = document.querySelector(`#deleteButton-${id}`);
+    setTimeout(() => {
+      const roleSelectBox = document.querySelector(`#roleSelectBox-${id}`);
+      if (roleSelectBox) {
+        // 요소 선택
+        roleSelectBox.addEventListener("change", async () => {
+          // 선택된 userId와 roleSelectBox를 전역 변수에 할당
+          const principalUser = await Api.get("/api/admin/user/principal");
 
-    // 권한 변경 시 모달 띄우기
-    roleSelectBox.addEventListener("change", () => {
-      // 선택된 userId와 roleSelectBox를 전역 변수에 할당
-      selectedUserId = id;
-      selectedRoleSelectBox = roleSelectBox;
+          selectedUserId = id;
+          selectedRoleSelectBox = roleSelectBox;
 
-      const selectedOption = selectedRoleSelectBox.options[selectedRoleSelectBox.selectedIndex];
-      if (selectedOption.value === "ADMIN") {
-        selectedRoleSelectBox.classList.add("has-background-danger-light", "has-text-danger");
-        selectedRoleSelectBox.classList.remove("has-background-link-light", "has-text-link");
+          //관리자가 본인이면 변경 불가능
+          if(principalUser.userId === id){
+            alert("관리자 본인은 권한상태를 변경할 수 없습니다.");
+            window.location.href = "/admin/users";  //리다이렉트 url
+            return;
+          }
+
+          const selectedOption = selectedRoleSelectBox.options[selectedRoleSelectBox.selectedIndex];
+          if (selectedOption.value === "ADMIN") {
+            selectedRoleSelectBox.classList.add("has-background-danger-light", "has-text-danger");
+            selectedRoleSelectBox.classList.remove("has-background-link-light", "has-text-link");
+          } else {
+            selectedRoleSelectBox.classList.add("has-background-link-light", "has-text-link");
+            selectedRoleSelectBox.classList.remove("has-background-danger-light", "has-text-danger");
+          }
+          // 모달 띄우기
+          adminCodeModal.classList.add("is-active");
+        });
       } else {
-        selectedRoleSelectBox.classList.add("has-background-link-light", "has-text-link");
-        selectedRoleSelectBox.classList.remove("has-background-danger-light", "has-text-danger");
+        console.error(`Element with id roleSelectBox-${id} not found`);
       }
-      // 모달 띄우기
-      adminCodeModal.classList.add("is-active");
-    });
+    }, 0); // 0ms의 짧은 딜레이
   }
+
+  //새로운 유저 목록을 컨테이너에 추가
+  usersContainer.appendChild(userList);
 
   // 총 요약에 값 삽입
   usersCount.innerText = addCommas(summary.usersCount);
   adminCount.innerText = addCommas(summary.adminCount);
+
+  // 페이지네이션 UI 생성
+  createPagination(currentPage, totalPages);
+}
+
+function createPagination(currentPage, totalPages) {
+  // 기존 페이지네이션 제거
+  const existingPagination = document.querySelector('.pagination');
+  if (existingPagination) {
+    existingPagination.remove();
+  }
+
+  // 페이지 수가 0일 경우 처리
+  if (totalPages <= 0) {
+    return; // 페이지네이션 생성하지 않음
+  }
+
+  const paginationContainer = document.createElement('nav');
+  paginationContainer.className = 'pagination is-centered';
+  paginationContainer.setAttribute('role', 'navigation');
+  paginationContainer.setAttribute('aria-label', 'pagination');
+
+  const paginationList = document.createElement('ul');
+  paginationList.className = 'pagination-list';
+
+  for (let i = 0; i < totalPages; i++) {
+    const pageItem = document.createElement('li');
+    const pageLink = document.createElement('a');
+    pageLink.className = 'pagination-link';
+    pageLink.setAttribute('aria-label', `Goto page ${i + 1}`);
+    pageLink.textContent = i + 1;
+
+    if (i === currentPage) {
+      pageLink.className += ' is-current';
+      pageLink.setAttribute('aria-current', 'page');
+    } else {
+      pageLink.addEventListener('click', () => {
+        insertUsers(i);  // 페이지 클릭 시 insertItems 호출
+      });
+    }
+
+    pageItem.appendChild(pageLink);
+    paginationList.appendChild(pageItem);
+  }
+
+  paginationContainer.appendChild(paginationList);
+  document.querySelector("#usersContainer").after(paginationContainer);  // 또는 "#eventsContainer"
 }
 
 // 모달 요소 선택 (루프 밖에서 한 번만 선택)
@@ -130,10 +238,19 @@ let selectedRoleSelectBox = null;
 // adminCodeConfirmButton을 한 번만 등록
 adminCodeConfirmButton.addEventListener("click", async () => {
   const adminCode = adminCodeInput.value;
-  const response = await Api.post("/api/users/grant", adminCode);
+//  const response = await Api.post("/api/users/grant", adminCode);
+  const response = await fetch("/api/users/grant",{
+    method: "Post",
+    headers: {
+        "Content-Type": "application/json",
+    },
+    body: JSON.stringify(adminCode),
+  });
+
+  const json = await response.json();
 
   // 관리자 코드 확인
-  if (response.message === 'success') {
+  if (json.message === 'success') {
     const newRole = selectedRoleSelectBox.value;
     const data = { roles: newRole };
 
@@ -144,12 +261,15 @@ adminCodeConfirmButton.addEventListener("click", async () => {
     // API 요청 (권한 변경)
     await Api.patch("/api/admin/grant",selectedUserId, data);
 
+    alert("해당 유저의 권한상태를 변경하였습니다.");
+
     // 모달 닫기
     adminCodeModal.classList.remove("is-active");
 
     window.location.href = "/admin/users";  //리다이렉트 url
   } else {
     alert("관리자 코드가 올바르지 않습니다.");
+    adminCodeInput.value = "";
   }
 });
 
@@ -161,9 +281,9 @@ adminCodeModalCloseButton.addEventListener("click", () => {
 });
 
 // 삭제 모달 닫기 버튼 이벤트 리스너
-deleteModalCloseButton.addEventListener("click", () => {
-  modal.classList.remove("is-active");
-});
+//deleteModalCloseButton.addEventListener("click", () => {
+//  modal.classList.remove("is-active");
+//});
 
 // db에서 회원정보 삭제
 async function deleteUserData(e) {

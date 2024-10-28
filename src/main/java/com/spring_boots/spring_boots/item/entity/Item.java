@@ -2,6 +2,8 @@ package com.spring_boots.spring_boots.item.entity;
 
 import com.spring_boots.spring_boots.category.entity.Category;
 import com.spring_boots.spring_boots.common.BaseTimeEntity;
+import com.spring_boots.spring_boots.config.StringListConverter;
+import com.spring_boots.spring_boots.orders.entity.OrderItems;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -24,14 +26,14 @@ public class Item extends BaseTimeEntity {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "category_id", nullable = false)
+    @JoinColumn(name = "category_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Category category;
 
     @Column(name = "item_name")
     private String itemName;
 
     @Column(name = "item_price")
-    private Integer itemPrice;
+    private Long itemPrice;
 
     @Column(name = "item_description")
     private String itemDescription;
@@ -40,13 +42,18 @@ public class Item extends BaseTimeEntity {
     private String itemMaker;
 
     @Column(name = "item_color")
-    private String itemColor;
+    @Convert(converter = StringListConverter.class)
+    private List<String> itemColor = new ArrayList<>();
 
-    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
 
     @Column(name = "image_url")
     private String imageUrl;
@@ -54,8 +61,14 @@ public class Item extends BaseTimeEntity {
     @Column(name = "item_size")
     private Integer itemSize;
 
+    @Column(name = "item_quantity", columnDefinition = "Integer default 0")
+    private Integer itemQuantity;  // 총 판매량 (주문 시 업뎃)
+
     @ElementCollection
     @CollectionTable(name = "item_keywords", joinColumns = @JoinColumn(name = "item_id"))
     @Column(name = "keyword")
     private List<String> keywords = new ArrayList<>();
+
+    @OneToMany(mappedBy = "item", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<OrderItems> orderItems = new ArrayList<>();
 }

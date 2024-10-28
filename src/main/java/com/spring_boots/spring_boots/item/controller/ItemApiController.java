@@ -4,7 +4,8 @@ import com.spring_boots.spring_boots.common.config.error.ResourceNotFoundExcepti
 import com.spring_boots.spring_boots.item.dto.CreateItemDto;
 import com.spring_boots.spring_boots.item.dto.ResponseItemDto;
 import com.spring_boots.spring_boots.item.dto.UpdateItemDto;
-import com.spring_boots.spring_boots.item.service.ItemRestService;
+import com.spring_boots.spring_boots.item.entity.Item;
+import com.spring_boots.spring_boots.item.service.ItemService;
 import com.spring_boots.spring_boots.s3Bucket.service.S3BucketService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,16 +18,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
 import java.io.IOException;
-import java.util.List;
 import java.util.Objects;
 
-@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api")
-public class ItemRestController {
+public class ItemApiController {
 
-    private final ItemRestService itemRestService;
+    private final ItemService itemService;
 
     private final S3BucketService s3BucketService;
 
@@ -40,7 +39,7 @@ public class ItemRestController {
                 requestItemDto.setImageUrl(imageUrl);
 
             }
-            ResponseItemDto responseDto = itemRestService.createItem(requestItemDto, file);
+            ResponseItemDto responseDto = itemService.createItem(requestItemDto, file);
             return new ResponseEntity<>(responseDto, HttpStatus.CREATED);
         } catch (IOException e) {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -51,9 +50,10 @@ public class ItemRestController {
 
     // Items 전체보기
     @GetMapping("/items")
-    public ResponseEntity<List<ResponseItemDto>> getItems() {
-        List<ResponseItemDto> result = itemRestService.getAllItems();
-        return new ResponseEntity<>(result, HttpStatus.OK);
+    public ResponseEntity<Page<ResponseItemDto>> getItems(@RequestParam(defaultValue = "0") int page,
+                                                          @RequestParam(defaultValue = "10") int size) {
+        Page<ResponseItemDto> result = itemService.getAllItems(page, size);
+        return ResponseEntity.ok(result);
     }
 
 
@@ -61,7 +61,7 @@ public class ItemRestController {
     @GetMapping("/items/{itemId}")
     public ResponseEntity<ResponseItemDto> getItem(@PathVariable("itemId") Long id) {
         try {
-            ResponseItemDto responseDto = itemRestService.getItem(id);
+            ResponseItemDto responseDto = itemService.getItem(id);
             return new ResponseEntity<>(responseDto, HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
@@ -72,7 +72,7 @@ public class ItemRestController {
     @DeleteMapping("/items/{itemId}")
     public ResponseEntity<Void> deleteItem(@PathVariable("itemId") Long id) {
         try {
-            itemRestService.deleteItem(id);
+            itemService.deleteItem(id);
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         } catch (ResourceNotFoundException e) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND); // 404 오류
@@ -83,36 +83,61 @@ public class ItemRestController {
 
     // Item 수정하기
     @PutMapping("/items/{itemId}")
-    public ResponseEntity<ResponseItemDto> updateItem (@PathVariable("itemId") Long id, @ModelAttribute UpdateItemDto updateItemDto) {
+    public ResponseEntity<ResponseItemDto> updateItem (@Valid @PathVariable("itemId") Long id, @ModelAttribute UpdateItemDto updateItemDto) {
         try {
-
-            ResponseItemDto responseDto = itemRestService.updateItem(id, updateItemDto);
+            ResponseItemDto responseDto = itemService.updateItem(id, updateItemDto);
             return new ResponseEntity<>(responseDto, HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
     }
 
-    // CategoryId로 Item 조회하기
+    // CategoryId로 Items 조회하기 (페이지 네이션, 정렬 추가)
     @GetMapping("/items/categories/{category_id}")
-    public ResponseEntity<List<ResponseItemDto>> getItemsByCategory(@PathVariable("category_id") Long category_id) {
+    public ResponseEntity<Page<ResponseItemDto>> getItemsByCategory(
+        @PathVariable("category_id") Long categoryId,
+        @RequestParam(required = false, defaultValue = "default") String sort,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "8") int limit) {
         try {
-            List<ResponseItemDto> result = itemRestService.getItemsByCategory(category_id);
+            Page<ResponseItemDto> result = itemService.getItemsByCategoryWithSorting(categoryId, sort, page, limit);
             return new ResponseEntity<>(result, HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
     }
 
-    // 키워드와 정렬 - Item 조회
+    // 테마에 해당하는 모든 아이템 - 전체보기 고정 구현
+    @GetMapping("/items/thema/{thema}")
+    public ResponseEntity<Page<ResponseItemDto>> getItemsByTheme(
+        @PathVariable("thema") String thema,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "8") int limit,
+        @RequestParam(defaultValue = "default") String sort) {
+
+        Page<ResponseItemDto> result = itemService.getItemsByCategoryThemaWithSorting(thema, sort, page, limit);
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    // 키워드와 정렬 - Items 조회
     @GetMapping("/items/search")
     public ResponseEntity<Page<ResponseItemDto>> searchItems(
         @RequestParam String keyword,
         @RequestParam(required = false) String sort,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "8") int limit) {
-        Page<ResponseItemDto> result = itemRestService.searchAndSortItems(keyword, sort, page, limit);
+        Page<ResponseItemDto> result = itemService.searchAndSortItems(keyword, sort, page, limit);
         return new ResponseEntity<>(result, HttpStatus.OK);
     }
+
+    // 상품 이름으로 조회
+    @GetMapping("/items/list/search/name")
+    public ResponseEntity<Page<ResponseItemDto>> searchItemsByName (@RequestParam String itemName,
+                                                                    @RequestParam(defaultValue = "0") int page,
+                                                                    @RequestParam(defaultValue = "10") int size) {
+        Page<ResponseItemDto> result = itemService.searchItemsByName(itemName, page, size);
+        return ResponseEntity.ok(result);
+    }
+
 
 }
