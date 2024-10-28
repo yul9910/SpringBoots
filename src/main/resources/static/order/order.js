@@ -8,8 +8,13 @@ document.addEventListener("DOMContentLoaded", async function() {
         const data = await response.text();
         document.getElementById("header-placeholder").innerHTML = data;
 
+        // 페이지 언로드 시 purchase 값 삭제
+        window.addEventListener('beforeunload', function () {
+            localStorage.removeItem('purchase');
+        });
         // Load cart items from local storage
         loadCartSummary();
+
     } catch (error) {
         console.error("헤더를 로드할 수 없습니다:", error);
     }
@@ -48,14 +53,20 @@ document.addEventListener("DOMContentLoaded", async function() {
 
 // 로컬 스토리지에서 장바구니 정보 로드 후 결제 정보 출력
 async function loadCartSummary() {
-    const cart = JSON.parse(localStorage.getItem('cart')) || [];
+    const cart = JSON.parse(localStorage.getItem('selectedItems')) || [];
+    let purchase = JSON.parse(localStorage.getItem('purchase')) || [];
+
+    // purchase가 배열이 아니면 배열로 변환
+    if (!Array.isArray(purchase)) {
+        purchase = [purchase];
+    }
+
     let itemsHtml = '';
     let totalPrice = 0;
 
     for (const item of cart) {
         // API를 사용하여 item_id로 아이템 정보 가져오기
         const productData = await getData(item.itemId);
-
         // 가져온 데이터가 없을 경우 continue
         if (!productData) continue;
 
@@ -80,10 +91,36 @@ async function loadCartSummary() {
         totalPrice += productData.item_price * item.itemQuantity;
     }
 
+    // purchase 아이템 처리 (바로 구매하기)
+    for (const item of purchase) {
+        const productData = await getData(item.itemId);
+        if (!productData) continue;
+
+        itemsHtml += `
+            <div class="box mb-4">
+                <article class="media">
+                    <figure class="media-left">
+                        <p class="image is-128x128">
+                            <img src="${productData.image_url}" alt="${productData.item_name}">
+                        </p>
+                    </figure>
+                    <div class="media-content">
+                        <div class="content">
+                            <p><strong>제품명: </strong>${productData.item_name}</p>
+                            <p><strong>사이즈(mm): </strong>${item.itemSize}</p>
+                            <p><strong>수량: </strong>${item.itemQuantity}개</p>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        `;
+        totalPrice += productData.item_price * item.itemQuantity;
+    }
+
     const summaryHtml = `
-        <p><strong>총 상품 금액: </strong>₩${totalPrice}</p>
-        <p><strong>배송비: </strong>₩0</p>
-        <p><strong>총 결제 금액: </strong>₩${totalPrice}</p>
+       <p><strong>총 상품 금액: </strong>${addCommas(totalPrice)}원</p>
+        <p><strong>배송비: </strong>0원</p>
+        <p><strong>총 결제 금액: </strong>${addCommas(totalPrice)}원</p>
     `;
 
     document.getElementById('order-items').innerHTML = itemsHtml;
@@ -128,11 +165,46 @@ function copyBuyerInfo() {
     }
 }
 
-// 주문하기 버튼을 눌렀을 때 폼 데이터와 장바구니 데이터로 주문 요청
 async function placeOrder() {
-    const cart = JSON.parse(localStorage.getItem('cart')) || [];
-    if (cart.length === 0) {
-        alert("장바구니가 비어있습니다.");
+
+    // 필수 입력값 가져오기
+    const buyerContact = document.getElementById('buyerContact').value.trim();
+    const recipientName = document.getElementById('recipientName').value.trim();
+    const shippingAddress = document.getElementById('shippingAddress').value.trim();
+    const shippingAddress2 = document.getElementById('shippingAddress2').value.trim();
+    const recipientContact = document.getElementById('recipientContact').value.trim();
+
+    // 전화번호가 숫자로만 이루어졌는지 확인하는 정규식
+    const phonePattern = /^[0-9]+$/;
+
+    // 필수 입력값 확인
+    if (!buyerContact || !recipientName || !shippingAddress || !shippingAddress2 || !recipientContact) {
+        alert("주문자 정보, 받는 분, 주소, 나머지 주소, 전화번호를 모두 입력해주세요.");
+        return; // 값이 비어있으면 주문 진행 중단
+    }
+
+    // 주문자 전화번호와 배송지 전화번호가 숫자로만 이루어졌는지 확인
+    if (!phonePattern.test(buyerContact)) {
+        alert("주문자의 전화번호는 숫자만 입력 가능합니다.");
+        return;
+    }
+    if (!phonePattern.test(recipientContact)) {
+        alert("수신자의 전화번호는 숫자만 입력 가능합니다.");
+        return;
+    }
+
+    const cart = JSON.parse(localStorage.getItem('selectedItems')) || [];
+    let purchase = JSON.parse(localStorage.getItem('purchase')) || [];
+
+
+    // purchase가 배열이 아니면 배열로 변환
+    if (!Array.isArray(purchase)) {
+        purchase = [purchase];
+    }
+
+    // cart와 purchase 모두 비어있으면 주문 불가
+    if (cart.length === 0 && purchase.length === 0) {
+        alert("주문할 상품이 없습니다.");
         return;
     }
 
@@ -141,17 +213,28 @@ async function placeOrder() {
         buyerContact: document.getElementById('buyerContact').value,
         recipientName: document.getElementById('recipientName').value,
         recipientContact: document.getElementById('recipientContact').value,
-        shippingAddress: document.getElementById("shippingAddress").value + " " + document.getElementById("shippingAddress2").value,
+        shippingAddress: document.getElementById("shippingAddress").value + ", " + document.getElementById("shippingAddress2").value,
         deliveryMessage: document.getElementById('deliveryMessage').value,
-        items: await Promise.all(cart.map(async (item) => {
-            const productData = await getData(item.itemId); // 상품 데이터 가져오기
-            return {
-                itemId: item.itemId,
-                itemQuantity: item.itemQuantity,
-                itemSize: item.itemSize,
-                itemPrice: productData.item_price // 상품 가격 설정
-            };
-        }))
+        items: [
+            ...await Promise.all(cart.map(async (item) => {
+                const productData = await getData(item.itemId); // 상품 데이터 가져오기
+                return {
+                    itemId: item.itemId,
+                    itemQuantity: item.itemQuantity,
+                    itemSize: item.itemSize,
+                    itemPrice: productData.item_price // 상품 가격 설정
+                };
+            })),
+            ...await Promise.all(purchase.map(async (item) => {
+                const productData = await getData(item.itemId); // 상품 데이터 가져오기
+                return {
+                    itemId: item.itemId,
+                    itemQuantity: item.itemQuantity,
+                    itemSize: item.itemSize,
+                    itemPrice: productData.item_price // 상품 가격 설정
+                };
+            }))
+        ]
     };
 
     // 로그 추가: 주문 데이터 확인
@@ -172,7 +255,9 @@ async function placeOrder() {
 
         const data = await response.json();
         alert("주문이 성공적으로 처리되었습니다!");
-        localStorage.removeItem('cart'); // 주문 완료 후 장바구니 비우기
+        localStorage.removeItem('purchase'); // 주문 완료 후 바로 구매한 항목 제거
+        localStorage.removeItem('cart'); // 주문 완료 후 바로 구매한 항목 제거
+        localStorage.removeItem('selectedItems'); // 주문 완료 후 바로 구매한 항목 제거
         const orderId = data.ordersId;
 
         window.location.href = `/order-summary?orderId=${orderId}`; // 주문 내역 페이지로 이동
@@ -183,6 +268,7 @@ async function placeOrder() {
     }
 }
 
+
 function openDaumPostcode() {
     new daum.Postcode({
         oncomplete: function(data) {
@@ -191,3 +277,7 @@ function openDaumPostcode() {
         }
     }).open();
 }
+
+const addCommas = (n) => {
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};

@@ -1,4 +1,4 @@
-import { checkLogin, createNavbar } from "../../useful-functions.js";
+import { checkLogin, createNavbar, validateEmail, validatePassword } from "../../useful-functions.js";
 import * as Api from "../../api.js";
 
 // 요소(element), input 혹은 상수
@@ -237,17 +237,24 @@ async function saveUserData(e) {
   const currentPassword = currentPasswordInput.value;
   const email =emailInput.value;
 
-  const isPasswordLong = updatePassword.length >= 4;
+  const isPasswordLong = validatePassword(updatePassword);
   const isPasswordSame = updatePassword === passwordConfirm;
+  const isEmailValid = validateEmail(email);
   const isPostalCodeChanged = postalCode !== (userData.address?.postalCode || "");
   const isAddress2Changed = address2 !== (userData.address?.address2 || "");
   const isAddressChanged = isPostalCodeChanged || isAddress2Changed;
   const isEmailChanged = email !== userData.email;
 
+  //이메일을 변경했는데 이메일 형식이 맞지않은경우
+  if(isEmailChanged && !isEmailValid){
+    closeModal();
+    return alert("이메일 형식이 맞지않습니다.");
+  }
+
   // 비밀번호를 새로 작성한 경우
   if (updatePassword && !isPasswordLong) {
     closeModal();
-    return alert("비밀번호는 4글자 이상이어야 합니다.");
+    return alert("비밀번호는 8자리 이상, 영문자, 특수 문자를 모두 포함해야합니다.");
   }
   if (updatePassword && !isPasswordSame) {
     closeModal();
@@ -299,7 +306,8 @@ async function saveUserData(e) {
     disableForm();
     closeModal();
   } catch (err) {
-    alert(`회원정보 저장 과정에서 오류가 발생하였습니다: ${err}`);
+    alert(`비밀번호를 잘못입력하셨습니다. 현재 비밀번호를 다시 입력해주세요`);
+    document.getElementById("currentPasswordInput").value = "";
   }
 }
 

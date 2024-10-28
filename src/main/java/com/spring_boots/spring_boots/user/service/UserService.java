@@ -8,16 +8,25 @@ import com.spring_boots.spring_boots.user.domain.Users;
 import com.spring_boots.spring_boots.user.domain.UsersInfo;
 import com.spring_boots.spring_boots.user.dto.UserDto;
 import com.spring_boots.spring_boots.user.dto.request.*;
+import com.spring_boots.spring_boots.user.dto.response.UserAdminCountResponseDto;
+import com.spring_boots.spring_boots.user.dto.response.UserDeleteResponseDto;
 import com.spring_boots.spring_boots.user.dto.response.UserResponseDto;
+import com.spring_boots.spring_boots.user.exception.PasswordNotMatchException;
+import com.spring_boots.spring_boots.user.exception.UserDeletedException;
+import com.spring_boots.spring_boots.user.exception.UserNotFoundException;
 import com.spring_boots.spring_boots.user.repository.UserInfoRepository;
 import com.spring_boots.spring_boots.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,11 +37,15 @@ import java.util.stream.Collectors;
 @Slf4j
 public class UserService {
 
+    private static final int PAGE_SIZE = 10;
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder bCryptPasswordEncoder;
     private final JwtProviderImpl jwtProvider;
     private final UserInfoRepository userInfoRepository;
+    @Value("${admin.code}")
+    private String adminCode;
 
+    //일반 회원가입
     public Users save(UserSignupRequestDto dto) {
         if (userRepository.existsByUserRealId(dto.getUserRealId())) {
             throw new IllegalArgumentException("이미 존재하는 ID 입니다.");
@@ -44,6 +57,7 @@ public class UserService {
                 .email(dto.getEmail())
                 .password(bCryptPasswordEncoder.encode(dto.getPassword()))
                 .role(UserRole.USER)
+                .provider(Provider.NONE)
                 .build();
 
         return userRepository.save(user);
@@ -61,20 +75,20 @@ public class UserService {
 
     public JwtTokenDto login(JwtTokenLoginRequest request) {
         Users user = userRepository.findByUserRealId(request.getUserRealId())
-                .orElseThrow(() -> new IllegalArgumentException("가입되지 않은 실제 ID 입니다."));
+                .orElseThrow(() -> new UserNotFoundException("가입되지 않은 ID 입니다."));
 
         if (user.isDeleted()) {
-            throw new IllegalArgumentException("정보가 삭제된 회원입니다.");
+            throw new UserDeletedException("회원 정보가 삭제된 상태입니다.");
         }
 
         if (!bCryptPasswordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("잘못된 비밀번호입니다.");
+            throw new PasswordNotMatchException("잘못된 비밀번호입니다.");
         }
 
         Map<String, Object> claims = Map.of(
                 "accountId", user.getUserId(),  //JWT 클래임에 accountId
                 "role", user.getRole(),  //JWT 클래임에 role
-                "provider",user.getProvider(),
+                "provider", user.getProvider(),
                 "userRealId", user.getUserRealId()   //JWT 클래임에 실제 ID 추가
         );
 
@@ -106,12 +120,14 @@ public class UserService {
     }
 
     @Transactional
-    public void updateNoneUser(Users user, UserUpdateRequestDto userUpdateRequestDto, Long userInfoId) {
-        if (!bCryptPasswordEncoder.matches(userUpdateRequestDto.getCurrentPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("잘못된 비밀번호입니다.");
+    public void updateNoneUser(UserDto userDto, UserUpdateRequestDto userUpdateRequestDto, Long userInfoId) {
+        if (!bCryptPasswordEncoder.matches(userUpdateRequestDto.getCurrentPassword(), userDto.getPassword())) {
+            throw new PasswordNotMatchException("잘못된 비밀번호입니다.");
         }
+        Users user = findById(userDto.getUserId());
 
-        UsersInfo usersInfo = userInfoRepository.findById(userInfoId).orElse(null);
+        //Users 엔티티에 있는 userId 값을 찾아서 반환
+        UsersInfo usersInfo = userInfoRepository.findByUsers_UserId(userInfoId).orElse(null);
         //회원정보가 이미 있다면 업데이트, 그렇지않다면 생성
         if (usersInfo != null) {
             usersInfo.updateUserInfo(userUpdateRequestDto);
@@ -138,11 +154,12 @@ public class UserService {
     }
 
     @Transactional
-    public void softDeleteUser(Users authUser) {
-        authUser.deleteUser();  //소프트 딜리트
+    public UserDeleteResponseDto softDeleteUser(UserDto userDto) {
+        Users user = findById(userDto.getUserId());
+        return user.deleteUser();
     }
 
-    public boolean checkPassword(Users authUser, UserPasswordRequestDto request) {
+    public boolean checkPassword(UserDto authUser, UserPasswordRequestDto request) {
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
         if (encoder.matches(request.getPassword(), authUser.getPassword())) {
             return true;    //비밀번호가 맞으면 true
@@ -175,7 +192,7 @@ public class UserService {
     //관리자코드체크
     public boolean checkAdminCode(AdminCodeRequestDto adminCodeDto) {
         //임의 토큰 만들기
-        String tempAdminCode = bCryptPasswordEncoder.encode("admin");
+        String tempAdminCode = bCryptPasswordEncoder.encode(adminCode);
         String adminCode = adminCodeDto.getAdminCode();
         if (bCryptPasswordEncoder.matches(adminCode, tempAdminCode)) {
             return true;
@@ -198,8 +215,10 @@ public class UserService {
     }
 
     @Transactional
-    public void updateGoogleUser(Users user, UserUpdateRequestDto userUpdateRequestDto, Long userInfoId) {
-        UsersInfo usersInfo = userInfoRepository.findById(userInfoId).orElse(null);
+    public void updateGoogleUser(UserDto userDto, UserUpdateRequestDto userUpdateRequestDto, Long userInfoId) {
+        UsersInfo usersInfo = userInfoRepository.findByUsers_UserId(userInfoId).orElse(null);
+        Users user = findById(userDto.getUserId());
+
         //회원정보가 이미 있다면 업데이트, 그렇지않다면 생성
         if (usersInfo != null) {
             usersInfo.updateUserInfo(userUpdateRequestDto);
@@ -207,5 +226,102 @@ public class UserService {
             UsersInfo newUsersInfo = userUpdateRequestDto.toUsersInfo(user);
             userInfoRepository.save(newUsersInfo);
         }
+    }
+
+    public boolean checkGoogleLoginDeleted(UserDto userDto) {
+        Users user = findById(userDto.getUserId());
+
+        return user.isDeleted();
+    }
+
+    public Page<UserResponseDto> getUsersByCreatedAt(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Users> usersPage = userRepository.findAll(pageable);
+
+        return usersPage.map(Users::toResponseDto);
+    }
+
+    public UserAdminCountResponseDto countUsers() {
+        List<Users> users = userRepository.findAll();
+        long countAdmin = users.stream()
+                .filter(user -> user.getRole().equals(UserRole.ADMIN))
+                .count();
+        long totalUsers = users.stream()
+                .filter(user -> !user.isDeleted())
+                .count();
+        return UserAdminCountResponseDto.builder()
+                .countAdmin(countAdmin)
+                .totalUser(totalUsers)
+                .build();
+    }
+
+    public boolean validateSignup(UserSignupRequestDto userSignupRequestDto) {
+        // username 유효성 검증: 2~20글자, 숫자 포함 불가
+        String username = userSignupRequestDto.getUsername();
+        boolean isUsernameValid = username != null && username.length() >= 2 && username.length() <= 20 && !username.matches(".*\\d.*");
+        if (!isUsernameValid) {
+            return false; // 유효성 검증 실패
+        }
+
+        // userRealId 유효성 검증: 6~20글자
+        String userRealId = userSignupRequestDto.getUserRealId();
+        boolean isUserRealIdValid = userRealId != null && userRealId.length() >= 6 && userRealId.length() <= 20;
+        if (!isUserRealIdValid) {
+            return false; // 유효성 검증 실패
+        }
+
+        // email 유효성 검증: 이메일 형식
+        String email = userSignupRequestDto.getEmail();
+        boolean isEmailValid = email != null && email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
+        if (!isEmailValid) {
+            return false; // 유효성 검증 실패
+        }
+
+        // password 유효성 검증: 8~20글자, 영문자, 특수문자 포함
+        String password = userSignupRequestDto.getPassword();
+        boolean isPasswordValid = password != null && password.length() >= 8 && password.length() <= 20
+                && password.matches("^(?=.*[a-zA-Z])(?=.*\\W).+$");
+        if (!isPasswordValid) {
+            return false; // 유효성 검증 실패
+        }
+
+        return true; // 모든 유효성 검증 통과
+
+    }
+
+    public boolean validateLogin(JwtTokenLoginRequest request) {
+        //아이디 값이 빈값이면 false
+        String userRealId = request.getUserRealId();
+        if (userRealId.isEmpty()) {
+            return false;
+        }
+
+        //패스워드 값이 빈값이면 false
+        String password = request.getPassword();
+        if (password.isEmpty()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public boolean validateUpdateUser(UserUpdateRequestDto request) {
+        //변경할 password 유효성 검증: 8~20글자, 영문자, 특수문자 포함
+        String password = request.getUpdatePassword();
+        boolean isPasswordValid = password != null && password.length() >= 8 && password.length() <= 20
+                && password.matches("^(?=.*[a-zA-Z])(?=.*\\W).+$");
+        //패스워드 값이 없으면 true, 있으면 유효성 검증
+        if (password!=null && !isPasswordValid) {
+            return false; // 유효성 검증 실패
+        }
+
+        // email 유효성 검증: 이메일 형식
+        String email = request.getEmail();
+        boolean isEmailValid = email != null && email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
+        if (!isEmailValid) {
+            return false; // 유효성 검증 실패
+        }
+
+        return true;
     }
 }

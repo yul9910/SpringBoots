@@ -22,6 +22,9 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+
+import java.util.List;
 
 import static org.springframework.boot.autoconfigure.security.servlet.PathRequest.toH2Console;
 
@@ -35,38 +38,50 @@ import static org.springframework.boot.autoconfigure.security.servlet.PathReques
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class WebSecurityConfig {
 
-    //        private final TokenProvider tokenProvider;
     private final UserDetailsServiceImpl userDetailsService;
     private final OAuth2UserCustomService oAuth2UserCustomService;
     private final JwtFilter jwtFilter;
-//    private final UserDetailsServiceImpl userDetailsService;    //유저 정보를 인증하는 객체
     private final OAuth2SuccessHandler successHandler;
     private final OAuth2AuthorizationRequestBasedOnCookieRepository cookieRepository;
-//    private final RedisTemplate redisTemplate;    //Redis db 사용
-
-//    @Bean
-//    public WebSecurityCustomizer webSecurityCustomizer() {
-//        return (web) -> web.ignoring()
-//                .requestMatchers(toH2Console())
-//                .requestMatchers("/static/**");
-//    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(csrf -> csrf.disable())  // H2 콘솔 접근을 위해 CSRF 비활성화 todo 배포시 삭제
-                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable))  // H2 콘솔에서 iframe 사용을 허용 todo 배포시 삭제
+                .csrf(csrf -> csrf.disable())  // H2 콘솔 접근을 위해 CSRF 비활성화, 배포시 주석처리
+//                .csrf(csrf -> csrf.ignoringRequestMatchers(
+//                        "/login","/register","/logout",
+//                        "/login/**","/register/**",
+//                        "/api/login","/api/logout"
+//                ))
+//                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable))  // H2 콘솔에서 iframe 사용을 허용, 배포시 주석처리
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(toH2Console()).permitAll()  // H2 콘솔에 대한 요청 허용
+//                        .requestMatchers(toH2Console()).permitAll()  // H2 콘솔에 대한 요청 허용, 배포시 주석처리
                         .requestMatchers(
-                                "/api/**","/login/**","/static/**","/home/**",
-                                "/","/register/**",
-                                "/login-resource/**","api.js","elice-rabbit.png",
-                                "useful-functions.js","elice-rabbit-favicon.png",
-                                "navbar.js", "/common/**","google.png"
-                                //todo 배포시 api 에 대한 접근 권한 조정
+                                //Api
+                                "/api/**",
+                                //정적경로
+                                "/category-detail/**","/category-form/**", "/category-recommend/**",    //카테고리
+                                "/common/**","/search/**",   //공통헤더
+                                "/event-detail/**","/event-form/**","/event-list/**",   //이벤트
+                                "/home/**","/images/**","/login/**","/register/**", //로그인, 홈, 회원가입
+                                "/product-detail/**","/page-not-found/**",  //상품
+                                "api.js", "useful-functions.js",    //공통 js 파일
+                                "indexed-db.js", "navbar.js",   //공통 js 파일
+                                "elice-rabbit.png","elice-rabbit-favicon.png",  //이미지
+                                "springboots_logo.png","/logo.png","google.png",    //이미지
+                                //url 경로
+                                "/","/login","/register",
+                                "/categories/**","/items/**","/events/**"
                         ).permitAll()  // 모든 요청에 대해 요청 허가
                         .anyRequest().authenticated())
+                .cors(cors -> cors.configurationSource(request -> {
+                    var config = new CorsConfiguration();
+                    config.setAllowedOrigins(List.of("https://xsadxbhpffmfhfsx.tunnel-pt.elice.io/", "http://localhost:3000")); // 허용할 도메인
+                    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH")); // 허용할 메서드
+                    config.setAllowCredentials(true); // 인증 정보 포함 여부
+                    config.setAllowedHeaders(List.of("*")); // 허용할 헤더
+                    return config;
+                }))
 
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

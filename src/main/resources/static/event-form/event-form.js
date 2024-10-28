@@ -80,13 +80,36 @@ async function fetchEventData() {
     }
 }
 
+// 날짜 포맷팅 함수
+function formatDate(date) {
+    // 서울 표준시 기준
+    const seoulTime = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+    const year = seoulTime.getFullYear();
+    const month = String(seoulTime.getMonth() + 1).padStart(2, '0');
+    const day = String(seoulTime.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// 현재 날짜
+function getCurrentDate() {
+    const now = new Date();
+    return formatDate(now);
+}
+
+// 1년 후 날짜
+function getOneYearLater() {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() + 1);
+    return formatDate(date);
+}
+
 async function handleSubmit(e) {
     e.preventDefault();
 
     const title = titleInput.value;
     const content = contentInput.value;
-    const startDate = startDateInput.value;
-    const endDate = endDateInput.value;
+    let startDate = startDateInput.value;
+    let endDate = endDateInput.value;
     const thumbnailImage = thumbnailInput.files[0];
     const contentImages = contentImageInput.files;
 
@@ -94,36 +117,52 @@ async function handleSubmit(e) {
         return alert("모든 필드를 입력해주세요.");
     }
 
-    if (thumbnailImage && thumbnailImage.size > 3e6) {
-        return alert("썸네일 이미지는 최대 2.5MB 크기까지 가능합니다.");
+    // 시작일이 비어있으면 현재 날짜로 설정
+    if (!startDate) {
+        startDate = getCurrentDate();
+        startDateInput.value = startDate;
     }
 
+    // 종료일이 비어있으면 1년 후로 설정
+    if (!endDate) {
+        endDate = getOneYearLater();
+        endDateInput.value = endDate;
+    }
+
+    // 썸네일 이미지 용량 체크 (500KB)
+    if (thumbnailImage && thumbnailImage.size > 500 * 1024) {
+        return alert("썸네일 이미지의 크기가 최대 500KB 크기를 초과했습니다.");
+    }
+
+    // 내용 이미지들의 총 용량 체크 (2.5MB)
+    let totalContentImageSize = 0;
     for (let i = 0; i < contentImages.length; i++) {
-        if (contentImages[i].size > 3e6) {
-            return alert(`내용 이미지 ${i+1}은(는) 최대 2.5MB 크기까지 가능합니다.`);
-        }
+        totalContentImageSize += contentImages[i].size;
+    }
+    if (totalContentImageSize > 2.5 * 1024 * 1024) {
+        return alert("내용 이미지의 총 크기가 최대 2.5MB 크기를 초과했습니다.");
     }
 
     try {
         const formData = new FormData();
 
         // JSON 데이터를 문자열로 변환하여 추가
-        const eventData = JSON.stringify({
+        const eventData = {
             eventTitle: title,
             eventContent: content,
             startDate: startDate,
             endDate: endDate
-        });
-        formData.append('event', new Blob([eventData], {type: 'application/json'}));
+        };
+        formData.append('event', new Blob([JSON.stringify(eventData)], {type: 'application/json'}));
 
-        // 썸네일 이미지 추가
+        // 썸네일 이미지 추가 - 필드명 수정
         if (thumbnailImage) {
-            formData.append('thumbnailImage', thumbnailImage);
+            formData.append('thumbnailFile', thumbnailImage);
         }
 
-        // 내용 이미지들 추가
+        // 내용 이미지들 추가 - 필드명 수정
         for (let i = 0; i < contentImages.length; i++) {
-            formData.append('contentImages', contentImages[i]);
+            formData.append('contentFiles', contentImages[i]);
         }
 
         let response;
@@ -141,6 +180,7 @@ async function handleSubmit(e) {
         alert(`문제가 발생하였습니다. 확인 후 다시 시도해 주세요: ${err.message}`);
     }
 }
+
 
 function handleImageUpload(e, nameSpan, preview, previewContainer) {
     const files = e.target.files;
@@ -173,3 +213,4 @@ function handleCancel() {
 
 // 페이지 로드 시 페이지 초기화 실행
 document.addEventListener('DOMContentLoaded', initializePage);
+

@@ -22,12 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
-public class ItemRestService {
+public class ItemService {
     private final ItemMapper itemMapper;
     private final ItemRepository itemRepository;
     private final S3BucketService s3BucketService;
@@ -38,11 +36,11 @@ public class ItemRestService {
     private String bucketName;
 
     @Autowired
-    public ItemRestService(ItemMapper itemMapper,
-                           ItemRepository itemRepository,
-                           S3BucketService s3BucketService,
-                           CategoryRepository categoryRepository,
-                           AmazonS3 amazonS3) {
+    public ItemService(ItemMapper itemMapper,
+                       ItemRepository itemRepository,
+                       S3BucketService s3BucketService,
+                       CategoryRepository categoryRepository,
+                       AmazonS3 amazonS3) {
         this.itemMapper = itemMapper;
         this.itemRepository = itemRepository;
         this.s3BucketService = s3BucketService;
@@ -52,9 +50,10 @@ public class ItemRestService {
 
 
     // Item 전체 보기
-    public List<ResponseItemDto> getAllItems() {
-        List<Item> items = itemRepository.findAll();
-        return items.stream().map(itemMapper::toResponseDto).collect(Collectors.toList());
+    public Page<ResponseItemDto> getAllItems(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Item> itemsPage = itemRepository.findAll(pageable);
+        return itemsPage.map(itemMapper::toResponseDto);
     }
 
     // Item 단일 보기
@@ -71,6 +70,9 @@ public class ItemRestService {
         String imageUrl = null;
 
         if (file != null && !file.isEmpty()) { // 이미지 파일 존재 유무 확인
+            if (file.getSize() > 10 * 1024 * 1024) {
+                throw new RuntimeException("이미지 파일 크기는 10MB를 초과할 수 없습니다.");
+            }
             try {
                 imageUrl = s3BucketService.uploadFile(file); // s3에 파일 업로드
             } catch (IOException e) {
@@ -110,15 +112,24 @@ public class ItemRestService {
                 .ifPresent(findItem::setItemMaker);
 
         //Item Color 수정
-        Optional.ofNullable(itemDto.getItemColor())
-                .ifPresent(findItem::setItemColor);
+        if (itemDto.getItemColor() != null) {
+            findItem.getItemColor().clear();
+            findItem.getItemColor().addAll(itemDto.getItemColor());
+        }
 
-        //Item Size 수정
-        Optional.ofNullable(itemDto.getItemSize())
-                .ifPresent(findItem::setItemSize);
+        // 카테고리 수정
+        if (itemDto.getCategoryId() != null) {
+            Category category = categoryRepository.findById(itemDto.getCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("카테고리를 찾을 수 없습니다: " + itemDto.getCategoryId()));
+            findItem.setCategory(category); // 카테고리 설정
+        }
 
-        //Item Image 수정
+        // Item Image 수정
         if (itemDto.getFile() != null && !itemDto.getFile().isEmpty()) { // 수정하기 위해 HTML에 등록한 이미지 파일이 null값이 아닌 경우 동작
+            if (itemDto.getFile().getSize() > 10 * 1024 * 1024) {
+                throw new RuntimeException("이미지 파일 크기는 10MB를 초과할 수 없습니다.");
+            }
+
             if (existingImageUrl != null) { // 기존 저장된 URL이 null인지 아닌지 체크
                 String key = existingImageUrl.substring(existingImageUrl.lastIndexOf("/") + 1);
                 amazonS3.deleteObject(new DeleteObjectRequest(bucketName, key));
@@ -129,6 +140,13 @@ public class ItemRestService {
         } else {
             findItem.setImageUrl(existingImageUrl);
         }
+
+        //키워드 수정
+        if (itemDto.getKeywords() != null) {
+            findItem.getKeywords().clear(); // 기존 키워드 삭제
+            findItem.getKeywords().addAll(itemDto.getKeywords()); // 새로운 키워드 추가
+        }
+
 
         Item updated = itemRepository.save(findItem);
         return itemMapper.toResponseDto(updated);
@@ -148,39 +166,58 @@ public class ItemRestService {
         itemRepository.delete(item);
     }
 
-    // Category로 Item 조회 리스트
-    public List<ResponseItemDto> getItemsByCategory(Long categoryId) {
-        List<Item> items = itemRepository.findAllByCategoryId(categoryId);
-        return items.stream().map(itemMapper::toResponseDto).collect(Collectors.toList());
 
+    // Category로 Item 조회 리스트
+    public Page<ResponseItemDto> getItemsByCategoryWithSorting(Long categoryId, String sort, int page, int limit) {
+        Pageable pageable = createPageableWithSort(sort, page, limit);
+        Page<Item> itemsPage = itemRepository.findAllByCategoryId(categoryId, pageable);
+        return itemsPage.map(itemMapper::toResponseDto);
     }
 
     // 검색한 아이템 키워드 정렬 옵션
     public Page<ResponseItemDto> searchAndSortItems(String keyword, String sort, int page, int limit) {
-        Pageable pageable = PageRequest.of(page, limit);
-        Page<Item> itemsPage;
-
-        switch (sort) {
-            case "price-asc":
-                // 낮은 가격순으로 정렬
-                pageable = PageRequest.of(page, limit, Sort.by(Sort.Direction.ASC, "itemPrice"));
-                break;
-            case "price-desc":
-                // 높은 가격순으로 정렬
-                pageable = PageRequest.of(page, limit, Sort.by(Sort.Direction.DESC, "itemPrice"));
-                break;
-            case "newest":
-                // 최신순으로 정렬
-                pageable = PageRequest.of(page, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
-                break;
-            default:
-                // 기본 상품 id별 정렬 유지
-                break;
-        }
-
-        itemsPage = itemRepository.findByKeywordsContainingIgnoreCase(keyword, pageable);
+        Pageable pageable = createPageableWithSort(sort, page, limit);
+        Page<Item> itemsPage = itemRepository.findByKeywordIgnoreCase(keyword, pageable);
         return itemsPage.map(itemMapper::toResponseDto);
     }
+
+    // 테마별 정렬된 모든 아이템 조회
+    public Page<ResponseItemDto> getItemsByCategoryThemaWithSorting(String thema, String sort, int page, int limit) {
+        Pageable pageable = createPageableWithSort(sort, page, limit);
+        Page<Item> itemsPage = itemRepository.findByCategory_CategoryThema(thema, pageable);
+        return itemsPage.map(itemMapper::toResponseDto);
+    }
+
+    // 정렬
+    private Pageable createPageableWithSort(String sort, int page, int limit) {
+        Sort sortOrder;
+        switch (sort) {
+            case "best":    // 판매량순
+                sortOrder = Sort.by(Sort.Direction.DESC, "itemQuantity");
+                break;
+            case "price-asc":  // 낮은 가격순
+                sortOrder = Sort.by(Sort.Direction.ASC, "itemPrice");
+                break;
+            case "price-desc":  // 높은 가격순
+                sortOrder = Sort.by(Sort.Direction.DESC, "itemPrice");
+                break;
+            case "newest":   // 최신순
+                sortOrder = Sort.by(Sort.Direction.DESC, "createdAt");
+                break;
+            default:   // 기본 상품 id 오름차순
+                sortOrder = Sort.by(Sort.Direction.ASC, "id");
+                break;
+        }
+        return PageRequest.of(page, limit, sortOrder);
+    }
+
+    // 상품 이름을 이용하여 검색
+    public Page<ResponseItemDto> searchItemsByName(String itemName, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Item> itemsPage = itemRepository.findByItemNameContainingIgnoreCase(itemName, pageable);
+        return itemsPage.map(itemMapper::toResponseDto);
+    }
+
 }
 
 
